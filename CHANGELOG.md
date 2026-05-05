@@ -4,6 +4,48 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.4] - 2026-05-05
+
+### Added
+
+- **Configurable point granularity per cycle** (`cycle.pointStep`: `0.1`, `0.25`, `0.5`, or `1`). The +/- buttons in Plan use this step for `points` and `pointsPerUnit`; `maxUnits` stays integer. Switching the step snaps every existing habit value onto the new grid (e.g., 0.25 → 0.5 turns 1.25 into 1.5). New cycles inherit `pointStep` from the cycle they're cloned from.
+- **Step-aware display precision** throughout the app: `1/1` for step `1`, `1.0/1.0` for step `0.5` or `0.1`, `1.00/1.00` for step `0.25`. Each entry uses its own cycle's step, so old days render in their original precision.
+- **Plan-tab edit safety**: opening Plan past day 1 of the current cycle auto-selects **Next**. Toggling back to Current shows a red warning banner — edits past day 1 can change scores already tallied.
+- **Count-habit clarity**: the counter row now shows `n / maxUnits` (units progress), separate from the points conversion in the header.
+- **Mode-specific trends endpoints** (one round-trip each):
+  - `GET /api/trend/cycle/:id` — daily buckets within one cycle.
+  - `GET /api/trend/month/:yyyy-mm` — daily buckets for a month.
+  - `GET /api/trend/cycle-summary` — one aggregate per cycle (year + all-time views share this).
+- **Cycle-summary storage** at `pk='main#CYCLE_SUM'`, lazy-filled on first read and invalidated on entry/cycle writes. All-time trends become O(1) DynamoDB Query after first view.
+- **`POST /api/cycle`** with server-assigned integer ids (atomic `nextCycleId` increment on the meta row). Front-end never picks an id.
+- **`userId`-prefixed partition keys** on every DynamoDB row (`main#DAY`, `main#CYCLE_DEF`, `main#CYCLE_SUM`). Multi-user is now a one-line change — replace the `USER_ID` constant with a per-request lookup.
+
+### Changed
+
+- **Strict per-day entry loading.** Boot fetches only `GET /api/entry/:today` plus `GET /api/cycle/:id`. Day navigation loads exactly one entry. No more bulk-load on app start.
+- **Cycle ids are positive integers** (1, 2, 3, …). Trends prev/next cycle is `id ± 1`. UUIDs from prior versions are migrated in place.
+- **Cycles split into per-row items** (`pk='main#CYCLE_DEF'`, sk=`cycleId`) instead of one `cyclesJson` blob. PUT cycle is O(1) regardless of total cycle count and no longer bound by DynamoDB's 400 KB item limit.
+- **Entry rows carry `cycleId`**, stamped at write time. Entry GET is one round-trip; re-stamped on cycle PUT when the date range moves.
+- **Orphan-habit sweep is conditional** — only runs when habit ids are genuinely orphaned (removed from this cycle and not present in any other). Bounded to the union of cycle ranges.
+- **Parallel cycle-summary fill** via `Promise.all` over missing cycles.
+- **Bounds bump consolidates to one round-trip** (initial `if_not_exists` + two parallel conditional extends) instead of three sequential UpdateItems.
+- **Trends UI driven by mode-specific data sources**: cycle/month modes plot daily buckets; year/all-time plot one point per cycle at its `startDate` (cycle averages).
+- **Front-end `state.cycles[]` removed**, replaced with sparse `state.cyclesById` map. The full cycle list is never held in memory.
+
+### Removed
+
+- **Bulk endpoints**: `GET /api/cycles`, `GET /api/entries`.
+- **DELETE endpoints**: `DELETE /api/cycle/:id`, `DELETE /api/entry/:date`. PUT entry with empty `habitValuesById` deletes server-side; nothing in the UI deletes a cycle.
+- **`cyclesJson` blob** on the meta row. Cycles are now individual rows.
+- Date-range query parameters on entry endpoints — strict per-item access only.
+
+### Migration (idempotent, runs on first request after deploy)
+
+- Cycle UUIDs → integer ids (sorted by `startDate`).
+- `cyclesJson` blob → individual `CYCLE_DEF` rows.
+- Plain `pk='DAY'` entry rows → `pk='main#DAY'` with `cycleId` stamped from the covering cycle.
+- Plain `pk='CYCLE'` summary rows → `pk='main#CYCLE_SUM'`.
+
 ## [0.3] - 2026-04-28
 
 ### Added

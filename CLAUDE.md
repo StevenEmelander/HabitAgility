@@ -31,7 +31,9 @@ A self-contained **single-file** web app (`app/tracker.html`) plus a small **AWS
    **Schema:**
 
    - per-entry `habitValuesById` — `{ habitId: boolean | number }`. A habit id with no defining cycle is stripped from every entry by the server sweep on the next cycle PUT/DELETE.
-   - per-cycle `{ id, startDate, endDate, lengthDays, categories[], habitDefinitions[] }`. Habits are boolean or count with `scoring` / point rules. Cloned cycles keep the same habit id until the last copy is removed.
+   - per-cycle `{ id, startDate, endDate, lengthDays, pointStep?, categories[], habitDefinitions[] }`. `pointStep` is one of `0.1 | 0.25 | 0.5 | 1` (default `1` if missing) and controls the +/- increment for `points` and `pointsPerUnit` in the Plan tab; `maxUnits` is always integer. The upcoming cycle inherits `pointStep` from the current cycle when auto-created. Habits are boolean or count with `scoring` / point rules. Cloned cycles keep the same habit id until the last copy is removed.
+
+   **Plan-edit nudge:** past day 1 of the current cycle, opening the Plan tab auto-selects the **Next** mode so the user is steered toward editing the upcoming cycle. They can still toggle back to **Current** — when they do, a warning banner reminds them that editing the current cycle's rules can change scores already tallied today. No hard lock; just a default + warning.
 
 3. **Privacy / telemetry.** No analytics, no third-party fonts or icons, no extra “phone home” beyond your own origin and `/api/cycles` + `/api/entries`.
 

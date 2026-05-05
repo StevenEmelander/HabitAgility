@@ -139,7 +139,7 @@ body {
 .plan-score-group { display: flex; align-items: center; gap: 4px; min-width: max-content; }
 .plan-score-group-max { margin-left: auto; }
 .plan-stepper-val {
-  min-width: 2.2em;
+  min-width: 3.2em;
   text-align: center;
   font-size: 12px;
   color: var(--text);

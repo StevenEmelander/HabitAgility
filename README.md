@@ -6,11 +6,13 @@ Mobile-first **habit tracker** (vanilla HTML/JS, no frameworks) with an **AWS CD
 
 ## Features
 
-- User-defined categories and habits, points per habit, configurable cycle length (default 14 days).
+- User-defined categories and habits, points per habit, configurable cycle length (default 14 days). Per-cycle point granularity (0.1 / 0.25 / 0.5 / 1) with step-aware display precision.
 - Three tabs: **Entry** (per-day check-ins), **Trends** (cycle / month / year / all-time), **Plan** (edit current or upcoming cycle).
-- **Per-item REST API:** boot loads everything in two calls (`GET /api/cycles` + `GET /api/entries`); edits debounce per item (`PUT /api/cycles/:id`, `PUT /api/entries/:date`). No date-range parameters anywhere.
-- **Server-side orphan-habit sweep:** when a habit is removed from every cycle, the lambda strips its values from every entry row and reports back so the front-end mirrors the change locally.
-- **No DynamoDB Scans.** Reads are partition-targeted `Query` and `GetItem` only.
+- **Strict per-item REST API.** Boot loads exactly two rows (`GET /api/entry/:today` + `GET /api/cycle/:id`). Day navigation loads one entry at a time. Trends fetches one cycle's daily detail, one month's, or all cycle summaries — never the full table. Edits debounce per item (`PUT /api/entry/:date`, `PUT /api/cycle/:id`, `POST /api/cycle`).
+- **Cycle aggregates cached in DynamoDB.** Year and all-time trends read pre-computed cycle summaries; missing summaries are lazy-filled on first view and invalidated on entry/cycle writes.
+- **Server-side orphan-habit sweep:** when a habit is removed from every cycle, the lambda strips its values from every entry row (bounded to cycle ranges) and reports back so the front-end mirrors locally.
+- **No DynamoDB Scans, ever.** Reads are partition-targeted `Query` and `GetItem` only.
+- **Multi-user-ready storage.** Every DynamoDB key is prefixed with a `userId` (single-user today, hardcoded `main`). Adding multi-user is a one-line change in the lambda.
 - **Edge-gated auth.** Lambda@Edge checks an `htok` cookie (SHA-256 of the deploy token); a one-time `?unlock=…` link sets the cookie. Sync Lambda also requires a CloudFront-injected `X-CF-Secret` header — direct Function URL calls are rejected.
 
 ## Repository layout

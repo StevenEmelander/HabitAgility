@@ -1,15 +1,12 @@
 import {
-  canTrendsNext,
-  canTrendsPrev,
-  cycleInfo,
-  entryFor,
-  enumerateDateKeys,
+  API_TREND,
   escapeHtml,
-  findCycleByDate,
-  getTrendsRange,
+  fmtPointsForStep,
+  getCurrentCycle,
+  getCycleById,
+  pointStep,
   state,
-  totalMax,
-  totalPoints,
+  todayKey,
 } from './core.js';
 
 function buildLineChart(data, avg, dayMax) {
@@ -25,59 +22,114 @@ function buildLineChart(data, avg, dayMax) {
   </svg>`;
 }
 
-/** At most maxPts samples for SVG (mean per bucket when downsampling). */
-function trendsChartSeries(days, ptsFor, maxPts) {
+/** Downsample a buckets array (server-supplied) to at most maxPts chart points. */
+function downsample(buckets, maxPts) {
   const cap = maxPts || 120;
-  if (days.length <= cap) return days.map((d) => ({ date: d, pts: ptsFor(d) }));
-  const bucket = Math.ceil(days.length / cap);
+  if (buckets.length <= cap) return buckets.slice();
+  const bucket = Math.ceil(buckets.length / cap);
   const out = [];
-  for (let i = 0; i < days.length; i += bucket) {
-    const slice = days.slice(i, i + bucket);
-    const avgB = slice.reduce((s, d) => s + ptsFor(d), 0) / slice.length;
-    out.push({ date: slice[0], pts: avgB });
+  for (let i = 0; i < buckets.length; i += bucket) {
+    const slice = buckets.slice(i, i + bucket);
+    const ptsSum = slice.reduce((s, b) => s + (b.pts || 0), 0);
+    const maxSum = slice.reduce((s, b) => s + (b.max || 0), 0);
+    const daysSum = slice.reduce((s, b) => s + (b.days || 1), 0);
+    out.push({ key: slice[0].key, pts: ptsSum, max: maxSum, days: daysSum });
   }
   return out;
 }
 
-export function renderTrends() {
-  const info = cycleInfo();
-  const ptsFor = (d) => totalPoints(entryFor(d), findCycleByDate(d) || info.cur);
-  const maxFor = (d) => totalMax(findCycleByDate(d) || info.cur);
-  const pctFor = (d) => {
-    const mx = maxFor(d);
-    if (!mx) return 0;
-    return (ptsFor(d) / mx) * 100;
-  };
-  const { from, to, label } = getTrendsRange();
-  const days = enumerateDateKeys(from, to);
-  const numDays = days.length || 1;
-  let sumPts = 0, sumMax = 0;
-  for (const d of days) {
-    sumPts += ptsFor(d);
-    sumMax += maxFor(d);
+/** Decide which trends URL or summary list applies to the current mode + step. */
+function pickTrendsSource() {
+  if (state.trendsMode === 'cycle') {
+    const id = state.trendsCycleId || state.currentCycleId;
+    if (id == null) return null;
+    return { kind: 'daily', url: `${API_TREND}/cycle/${encodeURIComponent(id)}`, label: `CYCLE ${id}` };
   }
-  const avgPerDay = sumPts / numDays;
-  const avgPctPerDay = sumMax ? (sumPts / sumMax) * 100 : 0;
-  const refMax = days.length ? Math.max(...days.map((d) => maxFor(d)), 1) : 1;
-  const chartDataPts = trendsChartSeries(days, ptsFor, 120);
-  const chartDataPct = trendsChartSeries(days, pctFor, 120);
+  if (state.trendsMode === 'month') {
+    const yyyymm = state.trendsMonth || todayKey().slice(0, 7);
+    const [y, m] = yyyymm.split('-').map(Number);
+    const labelDate = new Date(Date.UTC(y, m - 1, 1));
+    const label = labelDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }).toUpperCase();
+    return { kind: 'daily', url: `${API_TREND}/month/${encodeURIComponent(yyyymm)}`, label };
+  }
+  if (state.trendsMode === 'year') {
+    const yr = state.trendsYear || new Date().getFullYear();
+    return { kind: 'summaries', filter: 'year', year: yr, label: String(yr) };
+  }
+  return { kind: 'summaries', filter: 'all', label: 'ALL TIME' };
+}
+
+export function renderTrends() {
+  const cur = getCurrentCycle();
+  const step = pointStep(cur);
+  const source = pickTrendsSource();
   const mode = state.trendsMode;
-  const prevOk = canTrendsPrev();
-  const nextOk = canTrendsNext();
+
+  let label = 'TRENDS', from = '', to = '';
+  let buckets = []; // {key, pts, max, days}
+  let loaded = false;
+
+  if (!source) {
+    label = 'TRENDS';
+  } else if (source.kind === 'daily') {
+    label = source.label;
+    const cached = state.trendsCache[source.url];
+    if (cached) {
+      loaded = true;
+      from = cached.from;
+      to = cached.to;
+      buckets = (cached.buckets || []).slice();
+    }
+  } else {
+    label = source.label;
+    const summaries = state.cycleSummaries;
+    if (summaries) {
+      loaded = true;
+      let pool = summaries;
+      if (source.filter === 'year') {
+        const y = String(source.year);
+        pool = summaries.filter((s) => (s.startDate || '').startsWith(y) || (s.endDate || '').startsWith(y));
+      }
+      buckets = pool.map((s) => ({
+        key: s.startDate, pts: Number(s.pts) || 0, max: Number(s.max) || 0, days: Number(s.days) || 1,
+        cycleId: s.cycleId, endDate: s.endDate,
+      }));
+      if (buckets.length) { from = buckets[0].key; to = buckets[buckets.length - 1].endDate || buckets[buckets.length - 1].key; }
+    }
+  }
+
+  const sumPts = buckets.reduce((s, b) => s + (b.pts || 0), 0);
+  const sumMax = buckets.reduce((s, b) => s + (b.max || 0), 0);
+  const totalDays = buckets.reduce((s, b) => s + (b.days || 1), 0) || 1;
+  const avgPerDay = sumPts / totalDays;
+  const avgPctPerDay = sumMax ? (sumPts / sumMax) * 100 : 0;
+
+  // Per-bucket avg points/day for the chart Y-axis (so weekly/cycle buckets are comparable).
+  const chartPts = buckets.map((b) => ({ key: b.key, pts: (b.days ? b.pts / b.days : b.pts) }));
+  const chartPct = buckets.map((b) => ({ key: b.key, pts: b.max ? (b.pts / b.max) * 100 : 0 }));
+  const refMax = buckets.length ? Math.max(...buckets.map((b) => (b.days ? b.max / b.days : b.max)), 1) : 1;
+  const chartDataPts = downsample(chartPts, 120).map((b) => ({ date: b.key, pts: b.pts }));
+  const chartDataPct = downsample(chartPct, 120).map((b) => ({ date: b.key, pts: b.pts }));
+
+  const prevOk = mode !== 'all' && (mode !== 'cycle' || (state.trendsCycleId || 0) > 1);
+  const nextOk = mode !== 'all';
+
   const metricsBlock = `<div class="grid-metrics">
-      <div class="card"><div class="mono muted">POINTS</div><div class="stat" style="font-size:24px">${sumPts}</div><div class="mono muted">/ ${sumMax}</div></div>
+      <div class="card"><div class="mono muted">POINTS</div><div class="stat" style="font-size:24px">${fmtPointsForStep(sumPts, step)}</div><div class="mono muted">/ ${fmtPointsForStep(sumMax, step)}</div></div>
       <div class="card"><div class="mono muted">AVG / DAY</div><div class="stat" style="font-size:24px">${avgPerDay.toFixed(1)}</div><div class="mono muted">pts</div></div>
     </div>`;
-  const chartsBlock = `<div class="card">
+  const chartsBlock = !buckets.length
+    ? '<div class="card"><div class="muted" style="padding:12px 0">No data for this period.</div></div>'
+    : `<div class="card">
         <div class="row between" style="margin-bottom:8px;gap:8px;align-items:baseline">
-          <div class="mono muted">TOTAL POINTS (${days.length}D)</div>
+          <div class="mono muted">AVG POINTS / DAY (${buckets.length})</div>
           <div class="mono muted" style="font-size:11px">avg ${avgPerDay.toFixed(1)} pts/day</div>
         </div>
         ${buildLineChart(chartDataPts, avgPerDay, refMax)}
       </div>
       <div class="card">
         <div class="row between" style="margin-bottom:8px;gap:8px;align-items:baseline">
-          <div class="mono muted">PERCENT OF MAX (${days.length}D)</div>
+          <div class="mono muted">PERCENT OF MAX (${buckets.length})</div>
           <div class="mono muted" style="font-size:11px">avg ${avgPctPerDay.toFixed(1)}%</div>
         </div>
         ${buildLineChart(chartDataPct, avgPctPerDay, 100)}
@@ -94,7 +146,7 @@ export function renderTrends() {
         <button class="btn" type="button" data-action="trends-prev" ${prevOk ? '' : 'disabled'} aria-label="Previous period">←</button>
         <div class="col center" style="flex:1;min-width:0">
           <div class="mono" style="font-size:15px;margin-top:4px;text-align:center">${escapeHtml(label)}</div>
-          <div class="muted" style="font-size:12px;margin-top:4px">${from} → ${to}</div>
+          <div class="muted" style="font-size:12px;margin-top:4px">${loaded ? (from && to ? `${from} → ${to}` : '—') : 'loading…'}</div>
         </div>
         <button class="btn" type="button" data-action="trends-next" ${nextOk ? '' : 'disabled'} aria-label="Next period">→</button>
       </div>

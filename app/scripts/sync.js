@@ -1,14 +1,16 @@
 import {
-  API_CYCLES,
-  API_ENTRIES,
+  addDaysKey,
+  API_CYCLE,
+  API_ENTRY,
+  API_TREND,
   applyOrphanSweepLocally,
+  clone,
   load,
-  normalizeFirstCycleStartFromEntries,
   registerPushers,
   render,
   setSyncStatus,
-  sortCycles,
   state,
+  todayKey,
 } from './core.js';
 
 const CYCLE_DEBOUNCE_MS = 1500;
@@ -18,117 +20,175 @@ const cycleTimers = new Map();
 const entryTimers = new Map();
 let inflight = 0;
 
-function bumpStatus() {
-  setSyncStatus(inflight > 0 ? 'syncing' : 'ok');
-}
-
+function bumpStatus() { setSyncStatus(inflight > 0 ? 'syncing' : 'ok'); }
 function markError() { setSyncStatus('error'); render(); }
 
+// ── Per-item pushers ───────────────────────────────────────────────────
+
 function pushCycleSoon(cycleId) {
-  const existing = cycleTimers.get(cycleId);
-  if (existing) clearTimeout(existing);
+  const t = cycleTimers.get(cycleId); if (t) clearTimeout(t);
   cycleTimers.set(cycleId, setTimeout(() => flushCycle(cycleId), CYCLE_DEBOUNCE_MS));
 }
-
 function pushEntrySoon(dateKey) {
-  const existing = entryTimers.get(dateKey);
-  if (existing) clearTimeout(existing);
+  const t = entryTimers.get(dateKey); if (t) clearTimeout(t);
   entryTimers.set(dateKey, setTimeout(() => flushEntry(dateKey), ENTRY_DEBOUNCE_MS));
 }
 
 async function flushCycle(cycleId) {
   cycleTimers.delete(cycleId);
   delete state._dirtyCycleIds[cycleId];
-  const cycle = state.cycles.find((c) => c.id === cycleId);
-  inflight++;
-  bumpStatus();
-  render();
+  const cycle = state.cyclesById[cycleId];
+  if (!cycle) return;
+  inflight++; bumpStatus(); render();
   try {
-    let res;
-    if (!cycle) {
-      res = await fetch(`${API_CYCLES}/${encodeURIComponent(cycleId)}`, {
-        method: 'DELETE',
-        credentials: 'same-origin',
-      });
-    } else {
-      res = await fetch(`${API_CYCLES}/${encodeURIComponent(cycleId)}`, {
-        method: 'PUT',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          startDate: cycle.startDate,
-          endDate: cycle.endDate,
-          lengthDays: cycle.lengthDays,
-          categories: cycle.categories || [],
-          habitDefinitions: cycle.habitDefinitions || [],
-        }),
-      });
-      // Server returns the habit ids it stripped from entries during the orphan sweep.
-      // Mirror that locally so the next render hides those values.
-      if (res.ok) {
-        try {
-          const payload = await res.clone().json();
-          if (payload && Array.isArray(payload.removedHabitIds) && payload.removedHabitIds.length) {
-            applyOrphanSweepLocally(payload.removedHabitIds);
-          }
-        } catch (_) { /* response had no JSON body — fine */ }
-      }
-    }
+    const res = await fetch(`${API_CYCLE}/${encodeURIComponent(cycleId)}`, {
+      method: 'PUT',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        startDate: cycle.startDate,
+        endDate: cycle.endDate,
+        lengthDays: cycle.lengthDays,
+        pointStep: cycle.pointStep,
+        categories: cycle.categories || [],
+        habitDefinitions: cycle.habitDefinitions || [],
+      }),
+    });
     if (!res.ok) throw new Error('cycle ' + res.status);
+    try {
+      const payload = await res.clone().json();
+      if (payload && Array.isArray(payload.removedHabitIds) && payload.removedHabitIds.length) {
+        applyOrphanSweepLocally(payload.removedHabitIds);
+      }
+    } catch (_) {}
+    state.cycleSummaries = null;
+    state.trendsCache = {};
   } catch (_) {
     state._dirtyCycleIds[cycleId] = true;
-    inflight--;
-    markError();
-    return;
+    inflight--; markError(); return;
   }
-  inflight--;
-  bumpStatus();
-  render();
+  inflight--; bumpStatus(); render();
 }
 
 async function flushEntry(dateKey) {
   entryTimers.delete(dateKey);
   const entry = state.entriesByDate[dateKey];
-  const isDeleted = !entry || Object.keys(entry.habitValuesById || {}).length === 0;
+  const empty = !entry || Object.keys(entry.habitValuesById || {}).length === 0;
   delete state._dirtyEntryDates[dateKey];
-  if (isDeleted) {
-    state._deletedEntryDates = state._deletedEntryDates.filter((d) => d !== dateKey);
-  }
-  inflight++;
-  bumpStatus();
-  render();
+  if (empty) state._deletedEntryDates = state._deletedEntryDates.filter((d) => d !== dateKey);
+  inflight++; bumpStatus(); render();
   try {
-    let res;
-    if (isDeleted) {
-      res = await fetch(`${API_ENTRIES}/${encodeURIComponent(dateKey)}`, {
-        method: 'DELETE',
-        credentials: 'same-origin',
-      });
-      // 404 (already absent) is fine.
-      if (!res.ok && res.status !== 404) throw new Error('entry-del ' + res.status);
-    } else {
-      res = await fetch(`${API_ENTRIES}/${encodeURIComponent(dateKey)}`, {
-        method: 'PUT',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ habitValuesById: entry.habitValuesById || {} }),
-      });
-      if (!res.ok) throw new Error('entry-put ' + res.status);
+    const res = await fetch(`${API_ENTRY}/${encodeURIComponent(dateKey)}`, {
+      method: 'PUT',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ habitValuesById: empty ? {} : entry.habitValuesById }),
+    });
+    if (!res.ok) throw new Error('entry-put ' + res.status);
+    for (const url of Object.keys(state.trendsCache)) {
+      const r = state.trendsCache[url];
+      if (r && r.from <= dateKey && dateKey <= r.to) delete state.trendsCache[url];
     }
+    state.cycleSummaries = null;
   } catch (_) {
-    if (isDeleted) {
+    if (empty) {
       if (!state._deletedEntryDates.includes(dateKey)) state._deletedEntryDates.push(dateKey);
     } else {
       state._dirtyEntryDates[dateKey] = true;
     }
-    inflight--;
-    markError();
-    return;
+    inflight--; markError(); return;
   }
-  inflight--;
-  bumpStatus();
-  render();
+  inflight--; bumpStatus(); render();
 }
+
+// ── Lazy loaders ───────────────────────────────────────────────────────
+
+const inflightEntry = new Map();
+const inflightCycle = new Map();
+
+export async function loadEntry(dateKey) {
+  if (state._loadedEntryDates.has(dateKey)) return state.entriesByDate[dateKey];
+  if (inflightEntry.has(dateKey)) return inflightEntry.get(dateKey);
+  const p = (async () => {
+    try {
+      const res = await fetch(`${API_ENTRY}/${encodeURIComponent(dateKey)}`, { credentials: 'same-origin' });
+      if (!res.ok) throw new Error('entry ' + res.status);
+      const data = await res.json();
+      state.entriesByDate[dateKey] = {
+        habitValuesById: (data && data.habitValuesById) || {},
+        cycleId: (data && data.cycleId) || null,
+      };
+      state._loadedEntryDates.add(dateKey);
+      if (state.entriesByDate[dateKey].cycleId) {
+        await loadCycle(state.entriesByDate[dateKey].cycleId);
+      }
+      return state.entriesByDate[dateKey];
+    } finally { inflightEntry.delete(dateKey); }
+  })();
+  inflightEntry.set(dateKey, p);
+  return p;
+}
+
+export async function loadCycle(cycleId) {
+  if (cycleId == null) return null;
+  if (state._loadedCycleIds.has(cycleId)) return state.cyclesById[cycleId];
+  if (inflightCycle.has(cycleId)) return inflightCycle.get(cycleId);
+  const p = (async () => {
+    try {
+      const res = await fetch(`${API_CYCLE}/${encodeURIComponent(cycleId)}`, { credentials: 'same-origin' });
+      if (!res.ok) return null;
+      const cycle = await res.json();
+      state.cyclesById[cycle.id] = cycle;
+      state._loadedCycleIds.add(cycle.id);
+      return cycle;
+    } finally { inflightCycle.delete(cycleId); }
+  })();
+  inflightCycle.set(cycleId, p);
+  return p;
+}
+
+/** POST a new cycle. Body has all fields except id; server assigns the next integer. */
+export async function createCycle(template) {
+  const res = await fetch(API_CYCLE, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      startDate: template.startDate,
+      endDate: template.endDate,
+      lengthDays: template.lengthDays,
+      pointStep: template.pointStep,
+      categories: template.categories || [],
+      habitDefinitions: template.habitDefinitions || [],
+    }),
+  });
+  if (!res.ok) return null;
+  const cycle = await res.json();
+  state.cyclesById[cycle.id] = cycle;
+  state._loadedCycleIds.add(cycle.id);
+  state.cycleSummaries = null;
+  return cycle;
+}
+
+export async function loadCycleSummaries() {
+  if (state.cycleSummaries) return state.cycleSummaries;
+  const res = await fetch(`${API_TREND}/cycle-summary`, { credentials: 'same-origin' });
+  if (!res.ok) throw new Error('summaries ' + res.status);
+  const data = await res.json();
+  state.cycleSummaries = (data && data.summaries) || [];
+  return state.cycleSummaries;
+}
+
+export async function loadTrendUrl(url) {
+  if (state.trendsCache[url]) return state.trendsCache[url];
+  const res = await fetch(url, { credentials: 'same-origin' });
+  if (!res.ok) throw new Error('trend ' + res.status);
+  const data = await res.json();
+  state.trendsCache[url] = data;
+  return data;
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────
 
 function renderCloudUnavailable(reason) {
   document.body.style.overflow = '';
@@ -143,38 +203,52 @@ function renderCloudUnavailable(reason) {
     </div>`;
 }
 
+/**
+ * Ensure today's covering cycle exists in the cloud. Used at boot when the entry's cycleId
+ * is null (no cycle covers today yet). Loads the latest summary to clone categories/habits
+ * forward, then POSTs a new cycle covering today.
+ */
+async function ensureCurrentCycle() {
+  if (state.currentCycleId) return;
+  const today = todayKey();
+  let template = null;
+  try {
+    const summaries = await loadCycleSummaries();
+    if (summaries && summaries.length) {
+      const latest = summaries[summaries.length - 1];
+      template = await loadCycle(latest.cycleId);
+    }
+  } catch (_) {}
+  const length = (template && template.lengthDays) || 14;
+  const pointStep = (template && template.pointStep) || 1;
+  const categories = template ? clone(template.categories || []) : [];
+  const habits = template ? clone(template.habitDefinitions || []) : [];
+  const newCycle = await createCycle({
+    startDate: today,
+    endDate: addDaysKey(today, length - 1),
+    lengthDays: length,
+    pointStep,
+    categories,
+    habitDefinitions: habits,
+  });
+  if (!newCycle) return;
+  state.currentCycleId = newCycle.id;
+  // Reflect on today's cached entry so the UI sees it immediately.
+  const todayEntry = state.entriesByDate[today] || { habitValuesById: {}, cycleId: null };
+  todayEntry.cycleId = newCycle.id;
+  state.entriesByDate[today] = todayEntry;
+}
+
 export async function bootSync() {
   setSyncStatus('syncing');
   try {
-    const [cyclesRes, entriesRes] = await Promise.all([
-      fetch(API_CYCLES, { credentials: 'same-origin' }),
-      fetch(API_ENTRIES, { credentials: 'same-origin' }),
-    ]);
-    if (!cyclesRes.ok || !entriesRes.ok) {
-      setSyncStatus('error');
-      renderCloudUnavailable('Cannot load data from the server right now.');
-      return;
-    }
-    const cyclesPayload = await cyclesRes.json();
-    const entriesPayload = await entriesRes.json();
-    const cycles = Array.isArray(cyclesPayload && cyclesPayload.cycles) ? cyclesPayload.cycles : [];
-    const entries = (entriesPayload && typeof entriesPayload.entries === 'object' && entriesPayload.entries) || {};
-    state.cycles = cycles;
-    state.entriesByDate = {};
-    for (const dk of Object.keys(entries)) {
-      state.entriesByDate[dk] = { habitValuesById: entries[dk] || {} };
-    }
-    state.entryBounds = (cyclesPayload && cyclesPayload.entryBounds) || null;
-    state._dirtyCycleIds = {};
-    state._dirtyEntryDates = {};
-    state._deletedEntryDates = [];
-    sortCycles();
-    normalizeFirstCycleStartFromEntries();
+    const today = todayKey();
+    await loadEntry(today);
+    state.currentCycleId = state.entriesByDate[today].cycleId;
+    if (!state.currentCycleId) await ensureCurrentCycle();
     state.cloudReady = true;
     setSyncStatus('ok');
     render();
-    // If normalization shifted any cycles, persist them now.
-    for (const id of Object.keys(state._dirtyCycleIds)) pushCycleSoon(id);
   } catch (_) {
     setSyncStatus('error');
     renderCloudUnavailable('Network error while loading data.');
