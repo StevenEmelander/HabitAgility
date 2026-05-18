@@ -1,0 +1,63 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    name: Lint + test
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install root dev deps
+        run: npm ci --no-audit --no-fund
+
+      - name: Biome check (format + lint)
+        run: npm run check
+
+      - name: Run tests
+        run: npm test
+
+  cdk-synth:
+    name: CDK synth
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: infrastructure/package-lock.json
+
+      - name: Install CDK deps
+        working-directory: infrastructure
+        run: npm ci --no-audit --no-fund
+
+      - name: Synthesize CDK app (no AWS calls)
+        working-directory: infrastructure
+        env:
+          # Synth needs *some* token to satisfy the required context. Not deployed.
+          CDK_DEFAULT_REGION: us-west-2
+        run: npx cdk synth --context unlock_token=ci-synth-only --quiet

@@ -1,16 +1,16 @@
+import * as crypto from 'node:crypto';
+import * as path from 'node:path';
 import * as cdk from 'aws-cdk-lib';
-import * as s3 from 'aws-cdk-lib/aws-s3';
-import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
+import type * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
-import * as acm from 'aws-cdk-lib/aws-certificatemanager';
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as targets from 'aws-cdk-lib/aws-route53-targets';
-import * as lambda from 'aws-cdk-lib/aws-lambda';
-import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
-import { Construct } from 'constructs';
-import * as crypto from 'crypto';
-import * as path from 'path';
+import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
+import type { Construct } from 'constructs';
 
 interface GoodHabitTrackerStackProps extends cdk.StackProps {
   cert: acm.Certificate;
@@ -25,7 +25,11 @@ export class GoodHabitTrackerStack extends cdk.Stack {
     if (!unlockToken) {
       throw new Error('Required: --context unlock_token=<your-secret-token>');
     }
-    const cfSecret = crypto.createHash('sha256').update('cf-secret:' + unlockToken).digest('hex').slice(0, 32);
+    const cfSecret = crypto
+      .createHash('sha256')
+      .update('cf-secret:' + unlockToken)
+      .digest('hex')
+      .slice(0, 32);
 
     // ── DynamoDB: cycle definitions (date ranges, categories, habits/scoring) + per-day entries ─
     const cyclesTable = new dynamodb.Table(this, 'CyclesTable', {

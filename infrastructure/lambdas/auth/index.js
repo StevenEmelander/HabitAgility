@@ -1,11 +1,10 @@
-'use strict';
-const crypto = require('crypto');
+const crypto = require('node:crypto');
 
 // Unlock hash is injected by CDK at deploy time (see infrastructure/lib/cert-stack.ts).
 const UNLOCK_HASH = '__UNLOCK_HASH__';
 
 function getCookies(request) {
-  const raw = (request.headers['cookie'] || []).map(h => h.value).join('; ');
+  const raw = (request.headers.cookie || []).map((h) => h.value).join('; ');
   const result = {};
   for (const part of raw.split(';')) {
     const idx = part.indexOf('=');
@@ -23,7 +22,7 @@ function getUnlockTokenRaw(querystring) {
   const needle = 'unlock=';
   const start = querystring.indexOf(needle);
   if (start === -1) return null;
-  let i = start + needle.length;
+  const i = start + needle.length;
   const amp = querystring.indexOf('&', i);
   const end = amp === -1 ? querystring.length : amp;
   const enc = querystring.slice(i, end);
@@ -51,8 +50,8 @@ exports.handler = async (event) => {
   const cookies = getCookies(request);
 
   // Valid auth cookie — pass through
-  if (cookies['htok'] === UNLOCK_HASH) {
-    if (request.querystring && request.querystring.includes('unlock=')) {
+  if (cookies.htok === UNLOCK_HASH) {
+    if (request.querystring?.includes('unlock=')) {
       request.querystring = removeUnlockParam(request.querystring);
     }
     return request;
@@ -70,10 +69,12 @@ exports.handler = async (event) => {
         statusDescription: 'Found',
         headers: {
           location: [{ key: 'Location', value: dest }],
-          'set-cookie': [{
-            key: 'Set-Cookie',
-            value: 'htok=' + UNLOCK_HASH + '; Path=/; Max-Age=31536000; HttpOnly; Secure; SameSite=Lax',
-          }],
+          'set-cookie': [
+            {
+              key: 'Set-Cookie',
+              value: 'htok=' + UNLOCK_HASH + '; Path=/; Max-Age=31536000; HttpOnly; Secure; SameSite=Lax',
+            },
+          ],
           'cache-control': [{ key: 'Cache-Control', value: 'no-store, no-cache' }],
         },
       };

@@ -1,0 +1,66 @@
+name: deploy
+
+# Tag-triggered deploys: push a tag like "0.5" or "0.5.1" and the workflow runs.
+# Requires repo secrets:
+#   - AWS_ACCESS_KEY_ID
+#   - AWS_SECRET_ACCESS_KEY
+#   - UNLOCK_TOKEN   (the deploy-time secret hashed for Lambda@Edge)
+
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+'
+      - '[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Git ref to deploy (tag or branch)'
+        required: true
+        default: main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Lint + test + cdk deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install root dev deps
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint + test (gate the deploy)
+        run: npm run ci
+
+      - name: Install CDK deps
+        working-directory: infrastructure
+        run: npm ci --no-audit --no-fund
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - name: cdk deploy
+        working-directory: infrastructure
+        env:
+          UNLOCK_TOKEN: ${{ secrets.UNLOCK_TOKEN }}
+        run: npx cdk deploy --all --require-approval never --context "unlock_token=$UNLOCK_TOKEN"

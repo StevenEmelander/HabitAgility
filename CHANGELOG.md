@@ -4,6 +4,38 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.5] - 2026-05-07
+
+### Added
+
+- **`Goal` replaces `Max`** as the headline ceiling concept. New per-sprint `goalPoints` field (daily, default `10`); UI shows `pts / goal`; trends chart has a dashed goal reference line; the bounded "max possible" math is gone from the user-facing UI.
+- **Unlimited count habits.** Setting a count habit's daily limit to `0` makes it open-ended — counter has no upper clamp; UI renders `n` (not `n / limit`); `Limit: ∞` in Plan.
+- **Renamed `Cycle` → `Sprint`** throughout: API routes (`/api/sprint/*`, `/api/trend/sprint/*`, `/api/trend/sprint-summary`), DDB partition keys (`main#SPRINT_DEF`, `main#SPRINT_SUM`), the entry-row attribute (`sprintId`), UI labels, CSS class names, and every code symbol. The meta-row's `nextCycleId` becomes `nextSprintId`. Aligns terminology with the Agile sprint model.
+- **Tests.** Vitest setup at the repo root with parity tests for `pointsForEntry` (lambda ↔ front-end), `quantize`, `fmtPoints`, `fmtPointsForStep`, `decimalsForStep`, `pointStep`, `goalForSprint`. 24 tests passing.
+- **Linter + formatter.** Biome at the repo root: `npm run check`, `npm run check:fix`. Auto-formatted the entire codebase to a single consistent style.
+- **GitHub Actions CI.** `.github/workflows/ci.yml` runs Biome + Vitest + `cdk synth` on every PR. `.github/workflows/deploy.yml` runs the gate + `cdk deploy` on tag pushes (`X.Y` / `X.Y.Z`) and on manual dispatch.
+- **JSDoc types** for Sprint, Entry, Habit, Category, Summary, DayBucket in `app/scripts/types.js` — IDE autocomplete on the shared shapes without adding TypeScript.
+
+### Changed
+
+- **Lambda split into modules.** The 700-line single-file lambda is now 10 cohesive modules: `index.js` (router + dispatch), `constants.js`, `utils.js`, `db.js`, `scoring.js`, `meta.js`, `sprints.js`, `entries.js`, `summaries.js`, `orphan-sweep.js`. Behavior is unchanged.
+- **Front-end constants centralized** in `app/scripts/constants.js` (debounces, default goal, default sprint length, default point step, API base paths, chart caps). The math is in `app/scripts/scoring.js` (pure, no state, no DOM); `core.js` re-exports both so existing import sites keep working.
+- **handlers.js refactored to an action map.** Replaced the 26-branch `if (action === '...')` chain with `preBootActions` / `globalActions` / `entryActions` / `trendsActions` / `planActions` lookup tables. Each handler is a small function receiving `{ event, target, action, id, delta }`.
+- **`bumpBoundsOnPut` collapses 3 DDB UpdateItems into 1** read-modify-write. Caller can pass a pre-fetched meta row to skip the extra read entirely. ~67% fewer write ops on the entry-edit hot path.
+- **Multi-user-ready namespace** kept in place: every DDB key is prefixed via `userKey()`; sprint defs are individual rows under `pk='main#SPRINT_DEF'`; sprint summaries under `pk='main#SPRINT_SUM'`; entry rows carry `sprintId` for one-round-trip GETs.
+
+### Removed
+
+- **All migration scaffolding** (the cycle→sprint migration ran once on the first deploy, then was stripped in the next deploy). No legacy attribute fallbacks anywhere; no `ensureMigrated` plumbing.
+- **The "max points" concept** in the UI. The progress bar and trends charts now key off `goalPoints` instead of `totalMax`. `habitMax`, `categoryMax`, `totalMax` removed from core.js. The cycle-summary's `max` attribute is gone (re-deriveable from `goalPoints × days`).
+
+### Migration (one-shot, ran on first request after deploy; no longer in the code)
+
+- DDB partition `main#CYCLE_DEF` → `main#SPRINT_DEF` (rows rewritten in place).
+- DDB partition `main#CYCLE_SUM` → `main#SPRINT_SUM` (old summaries dropped, lazy-fill on next trends view).
+- Entry-row attribute `cycleId` → `sprintId`.
+- Meta-row attribute `nextCycleId` → `nextSprintId`.
+
 ## [0.4] - 2026-05-05
 
 ### Added

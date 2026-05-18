@@ -1,0 +1,21 @@
+{
+  "name": "good-habit-tracker",
+  "private": true,
+  "version": "0.5.0",
+  "description": "Good Habit Tracker — root tooling (lint, format, tests). Deploy lives in infrastructure/.",
+  "type": "module",
+  "scripts": {
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "check": "biome check .",
+    "check:fix": "biome check --write .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "ci": "npm run check && npm test"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "vitest": "^2.1.8"
+  }
+}

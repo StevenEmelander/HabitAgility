@@ -6,10 +6,10 @@ Mobile-first **habit tracker** (vanilla HTML/JS, no frameworks) with an **AWS CD
 
 ## Features
 
-- User-defined categories and habits, points per habit, configurable cycle length (default 14 days). Per-cycle point granularity (0.1 / 0.25 / 0.5 / 1) with step-aware display precision.
+- User-defined categories and habits, points per habit, configurable **sprint** length (default 14 days). Per-sprint daily `goalPoints` (default 10) plus per-sprint point granularity (0.1 / 0.25 / 0.5 / 1) with step-aware display precision. Count habits can be unlimited (`dailyLimit = 0`).
 - Three tabs: **Entry** (per-day check-ins), **Trends** (cycle / month / year / all-time), **Plan** (edit current or upcoming cycle).
-- **Strict per-item REST API.** Boot loads exactly two rows (`GET /api/entry/:today` + `GET /api/cycle/:id`). Day navigation loads one entry at a time. Trends fetches one cycle's daily detail, one month's, or all cycle summaries — never the full table. Edits debounce per item (`PUT /api/entry/:date`, `PUT /api/cycle/:id`, `POST /api/cycle`).
-- **Cycle aggregates cached in DynamoDB.** Year and all-time trends read pre-computed cycle summaries; missing summaries are lazy-filled on first view and invalidated on entry/cycle writes.
+- **Strict per-item REST API.** Boot loads exactly two rows (`GET /api/entry/:today` + `GET /api/sprint/:id`). Day navigation loads one entry at a time. Trends fetches one sprint's daily detail, one month's, or all sprint summaries — never the full table. Edits debounce per item (`PUT /api/entry/:date`, `PUT /api/sprint/:id`, `POST /api/sprint`).
+- **Sprint aggregates cached in DynamoDB.** Year and all-time trends read pre-computed sprint summaries; missing summaries are lazy-filled on first view and invalidated on entry/sprint writes.
 - **Server-side orphan-habit sweep:** when a habit is removed from every cycle, the lambda strips its values from every entry row (bounded to cycle ranges) and reports back so the front-end mirrors locally.
 - **No DynamoDB Scans, ever.** Reads are partition-targeted `Query` and `GetItem` only.
 - **Multi-user-ready storage.** Every DynamoDB key is prefixed with a `userId` (single-user today, hardcoded `main`). Adding multi-user is a one-line change in the lambda.
@@ -20,11 +20,15 @@ Mobile-first **habit tracker** (vanilla HTML/JS, no frameworks) with an **AWS CD
 | Path | Purpose |
 |------|---------|
 | `app/tracker.html` | Web app shell (links the modules below) |
-| `app/scripts/` | ES modules: `core.js`, `sync.js`, `handlers.js`, `entry-ui.js`, `trends-ui.js`, `plan-ui.js`, `main.js` |
+| `app/scripts/` | ES modules: `constants.js`, `scoring.js`, `types.js`, `core.js`, `sync.js`, `handlers.js`, `entry-ui.js`, `trends-ui.js`, `plan-ui.js`, `main.js` |
 | `app/styles/tracker.css` | Single stylesheet |
-| `infrastructure/` | CDK app + `lambdas/sync` (per-item API) + `lambdas/auth` (edge gate) |
-| `scripts/backup.ps1`, `backup.sh` | Hits the API, dumps cycles + entries to a timestamped JSON file in `backups/` |
-| `deploy.sh` / `deploy.ps1` | `npm install` + `cdk deploy` |
+| `infrastructure/lambdas/sync/` | Lambda split into modules: `index.js` (router), `constants.js`, `utils.js`, `db.js`, `scoring.js`, `meta.js`, `sprints.js`, `entries.js`, `summaries.js`, `orphan-sweep.js` |
+| `infrastructure/lib/`, `infrastructure/bin/` | CDK stack definitions + cert stack |
+| `scripts/backup.ps1`, `backup.sh` | Hits the API, dumps sprints + entries to a timestamped JSON file in `backups/` |
+| `tests/` | Vitest parity tests for habit-points math (lambda ↔ front-end) |
+| `biome.json`, `vitest.config.js`, `package.json` | Repo-root tooling: Biome (lint + format) and Vitest |
+| `.github/workflows/` | CI: lint + test + `cdk synth` on PR; tag-triggered `cdk deploy` |
+| `deploy.sh` / `deploy.ps1` | Manual `npm install` + `cdk deploy` |
 
 ## Requirements
 

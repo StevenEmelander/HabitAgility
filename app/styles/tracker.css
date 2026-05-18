@@ -116,7 +116,7 @@ body {
 .plan-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 6px; }
 .plan-seg .btn { width: 100%; justify-content: center; }
 .plan-h { font-size: 10px; letter-spacing: 0.09em; color: var(--muted); margin: 0 0 6px; text-transform: uppercase; }
-.plan-cycle-dates { font-size: 11px; color: var(--muted); margin-top: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.plan-sprint-dates { font-size: 11px; color: var(--muted); margin-top: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .plan-cat-toolbar { padding: 12px 14px; }
 .plan-cat-toolbar-inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
 .plan-cat-toolbar-lbl { font-size: 10px; letter-spacing: 0.09em; color: var(--muted); text-transform: uppercase; }
@@ -137,7 +137,7 @@ body {
 .plan-scores > .row { gap: 5px; flex-wrap: wrap; }
 .plan-stepper { gap: 4px; flex-wrap: nowrap; align-items: center; }
 .plan-score-group { display: flex; align-items: center; gap: 4px; min-width: max-content; }
-.plan-score-group-max { margin-left: auto; }
+.plan-score-group-limit { margin-left: auto; }
 .plan-stepper-val {
   min-width: 3.2em;
   text-align: center;

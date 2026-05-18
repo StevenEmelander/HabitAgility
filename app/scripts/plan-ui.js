@@ -1,19 +1,19 @@
 import {
+  POINT_STEPS,
   escapeHtml,
   fmtPoints,
   fmtPointsForStep,
-  getCurrentCycle,
-  getCycleById,
+  getCurrentSprint,
+  getSprintById,
+  goalForSprint,
   hasAnyEntries,
-  isCurrentCycleFirstDay,
-  POINT_STEPS,
+  isCurrentSprintFirstDay,
   pointStep,
   state,
-  totalMax,
 } from './core.js';
 
 function planCatAccent(cat) {
-  const a = String((cat && cat.accent) || '#d4a574').trim();
+  const a = String(cat?.accent || '#d4a574').trim();
   return /^#[0-9a-fA-F]{3,8}$/.test(a) ? a : '#d4a574';
 }
 
@@ -47,46 +47,62 @@ export function renderAddHabitModal() {
 export function renderPlan() {
   const hasEntries = hasAnyEntries();
   if (!hasEntries) state.planMode = 'current';
-  const c = state.planMode === 'next'
-    ? getCycleById((state.currentCycleId || 0) + 1)
-    : getCurrentCycle();
-  const step = pointStep(c);
-  const categories = (c && c.categories ? c.categories : []).slice().sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
-  const cycleHead = hasEntries && state.planMode === 'next' ? 'Upcoming cycle' : 'Current cycle';
-  if (!c) {
+  const s = state.planMode === 'next' ? getSprintById((state.currentSprintId || 0) + 1) : getCurrentSprint();
+  const step = pointStep(s);
+  const categories = (s?.categories ? s.categories : [])
+    .slice()
+    .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+  const sprintHead = hasEntries && state.planMode === 'next' ? 'Upcoming sprint' : 'Current sprint';
+  if (!s) {
     return `<div class="plan-root">
       <div class="plan-h">Plan</div>
-      ${hasEntries ? `<div class="plan-seg">
+      ${
+        hasEntries
+          ? `<div class="plan-seg">
         <button type="button" class="btn ${state.planMode === 'current' ? 'primary' : ''}" data-action="plan-mode" data-mode="current">Current</button>
         <button type="button" class="btn ${state.planMode === 'next' ? 'plan' : ''}" data-action="plan-mode" data-mode="next">Next</button>
-      </div>` : ''}
-      <div class="card"><div class="muted" style="font-size:14px;line-height:1.45">Loading ${cycleHead.toLowerCase()}…</div></div>
+      </div>`
+          : ''
+      }
+      <div class="card"><div class="muted" style="font-size:14px;line-height:1.45">Loading ${sprintHead.toLowerCase()}…</div></div>
     </div>`;
   }
-  // Past day 1, editing the current cycle's rules can change today's already-scored
+  // Past day 1, editing the current sprint's rules can change today's already-scored
   // values. Warn the user; suggest editing Next instead.
-  const showCurrentWarning = state.planMode === 'current' && hasEntries && !isCurrentCycleFirstDay();
+  const showCurrentWarning = state.planMode === 'current' && hasEntries && !isCurrentSprintFirstDay();
   const warning = showCurrentWarning
-    ? `<div class="card" style="border-color:var(--danger)"><div style="font-size:13px;line-height:1.4;color:var(--danger)"><strong>Heads up:</strong> editing the current cycle past day 1 can change scores you've already tallied. Consider switching to <strong>Next</strong> to plan the upcoming cycle without affecting history.</div></div>`
+    ? `<div class="card" style="border-color:var(--danger)"><div style="font-size:13px;line-height:1.4;color:var(--danger)"><strong>Heads up:</strong> editing the current sprint past day 1 can change scores you've already tallied. Consider switching to <strong>Next</strong> to plan the upcoming sprint without affecting history.</div></div>`
     : '';
+  const goal = goalForSprint(s);
   return `<div class="plan-root">
     <div class="plan-h">Plan</div>
-    ${hasEntries ? `<div class="plan-seg">
+    ${
+      hasEntries
+        ? `<div class="plan-seg">
       <button type="button" class="btn ${state.planMode === 'current' ? 'primary' : ''}" data-action="plan-mode" data-mode="current">Current</button>
       <button type="button" class="btn ${state.planMode === 'next' ? 'plan' : ''}" data-action="plan-mode" data-mode="next">Next</button>
-    </div>` : ''}
+    </div>`
+        : ''
+    }
     ${warning}
-    <div class="card plan-cycle-card">
-      <div class="mono muted" style="font-size:10px;letter-spacing:0.07em;margin-bottom:6px">${cycleHead.toUpperCase()}</div>
+    <div class="card plan-sprint-card">
+      <div class="mono muted" style="font-size:10px;letter-spacing:0.07em;margin-bottom:6px">${sprintHead.toUpperCase()}</div>
       <div class="row between" style="flex-wrap:wrap;gap:10px;align-items:flex-start">
         <div style="min-width:0">
-          <div style="font-size:20px;font-weight:700;line-height:1.12">${fmtPointsForStep(totalMax(c), step)}<span class="muted" style="font-size:13px;font-weight:500"> max/day</span></div>
-          <div class="plan-cycle-dates">${c.startDate} → ${c.endDate}</div>
+          <div style="font-size:20px;font-weight:700;line-height:1.12">${fmtPointsForStep(goal, step)}<span class="muted" style="font-size:13px;font-weight:500"> goal/day</span></div>
+          <div class="plan-sprint-dates">${s.startDate} → ${s.endDate}</div>
         </div>
         <div class="col" style="gap:4px;align-items:flex-end;min-width:fit-content">
-          <div class="row" style="gap:5px"><button type="button" class="btn" data-action="cycle-len" data-delta="-7">−7d</button><button type="button" class="btn" data-action="cycle-len" data-delta="7">+7d</button></div>
-          <span class="mono muted" style="font-size:11px">${c.lengthDays} days</span>
+          <div class="row" style="gap:5px"><button type="button" class="btn" data-action="sprint-len" data-delta="-7">−7d</button><button type="button" class="btn" data-action="sprint-len" data-delta="7">+7d</button></div>
+          <span class="mono muted" style="font-size:11px">${s.lengthDays} days</span>
         </div>
+      </div>
+      <div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap;align-items:center">
+        <span class="plan-lbl">Goal:</span>
+        <button type="button" class="btn" data-action="goal-step" data-delta="-1">−</button>
+        <div class="mono plan-stepper-val">${fmtPointsForStep(goal, step)}</div>
+        <button type="button" class="btn" data-action="goal-step" data-delta="1">+</button>
+        <span class="muted" style="font-size:11px">pts/day</span>
       </div>
       ${renderPointStepSelector(step)}
     </div>
@@ -96,7 +112,7 @@ export function renderPlan() {
         <button type="button" class="btn primary" data-action="add-category">+ Category</button>
       </div>
     </div>
-    ${categories.map(cat => renderPlanCategory(c, cat, step)).join('')}
+    ${categories.map((cat) => renderPlanCategory(s, cat, step)).join('')}
   </div>`;
 }
 
@@ -111,8 +127,8 @@ function renderPointStepSelector(currentStep) {
   </div>`;
 }
 
-function renderPlanCategory(c, cat, step) {
-  const habits = (c.habitDefinitions || []).filter(h => h.categoryId === cat.id);
+function renderPlanCategory(sprint, cat, step) {
+  const habits = (sprint.habitDefinitions || []).filter((h) => h.categoryId === cat.id);
   return `<div class="card plan-cat" style="--cat-accent:${planCatAccent(cat)}">
     <div class="plan-cat-head">
       <div class="plan-cat-title">${escapeHtml(cat.label)}</div>
@@ -122,34 +138,35 @@ function renderPlanCategory(c, cat, step) {
         <button type="button" class="btn danger" data-action="remove-category" data-id="${cat.id}" aria-label="Delete category">Remove</button>
       </div>
     </div>
-    <div class="col plan-cat-habits">${habits.map(h => renderPlanHabit(h, step)).join('')}</div>
+    <div class="col plan-cat-habits">${habits.map((h) => renderPlanHabit(h, step)).join('')}</div>
   </div>`;
 }
 
 function renderPlanHabit(h, step) {
   const ptsOn = h.scoring.points || 0;
   const ppu = h.scoring.pointsPerUnit || 0;
-  const cap = h.scoring.maxUnits || 0;
+  const limit = Number(h.scoring.dailyLimit) || 0;
   const stepper = (field, delta, display) => `<div class="row plan-stepper">
     <button type="button" class="btn" data-action="score-edit" data-id="${h.id}" data-field="${field}" data-delta="${-delta}">−</button>
     <div class="mono plan-stepper-val">${display}</div>
     <button type="button" class="btn" data-action="score-edit" data-id="${h.id}" data-field="${field}" data-delta="${delta}">+</button>
   </div>`;
-  const scoreBtns = h.kind === 'boolean'
-    ? `<div class="plan-scores">
+  const scoreBtns =
+    h.kind === 'boolean'
+      ? `<div class="plan-scores">
         <div class="plan-score-group">
           <div class="plan-lbl">Points:</div>
           ${stepper('points', step, fmtPointsForStep(ptsOn, step))}
         </div>
       </div>`
-    : `<div class="plan-scores">
+      : `<div class="plan-scores">
         <div class="plan-score-group">
           <div class="plan-lbl">Points:</div>
           ${stepper('pointsPerUnit', step, fmtPointsForStep(ppu, step))}
         </div>
-        <div class="plan-score-group plan-score-group-max">
-          <div class="plan-lbl">Max:</div>
-          ${stepper('maxUnits', 1, String(cap))}
+        <div class="plan-score-group plan-score-group-limit">
+          <div class="plan-lbl">Limit:</div>
+          ${stepper('dailyLimit', 1, limit > 0 ? String(limit) : '∞')}
         </div>
       </div>`;
   return `<div class="card2 plan-habit">

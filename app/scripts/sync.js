@@ -1,8 +1,15 @@
 import {
-  addDaysKey,
-  API_CYCLE,
   API_ENTRY,
+  API_SPRINT,
   API_TREND,
+  DEFAULT_GOAL_POINTS,
+  DEFAULT_POINT_STEP,
+  DEFAULT_SPRINT_LENGTH_DAYS,
+  ENTRY_DEBOUNCE_MS,
+  SPRINT_DEBOUNCE_MS,
+} from './constants.js';
+import {
+  addDaysKey,
   applyOrphanSweepLocally,
   clone,
   load,
@@ -13,61 +20,78 @@ import {
   todayKey,
 } from './core.js';
 
-const CYCLE_DEBOUNCE_MS = 1500;
-const ENTRY_DEBOUNCE_MS = 1500;
-
-const cycleTimers = new Map();
+const sprintTimers = new Map();
 const entryTimers = new Map();
 let inflight = 0;
 
-function bumpStatus() { setSyncStatus(inflight > 0 ? 'syncing' : 'ok'); }
-function markError() { setSyncStatus('error'); render(); }
+function bumpStatus() {
+  setSyncStatus(inflight > 0 ? 'syncing' : 'ok');
+}
+function markError() {
+  setSyncStatus('error');
+  render();
+}
 
 // ── Per-item pushers ───────────────────────────────────────────────────
 
-function pushCycleSoon(cycleId) {
-  const t = cycleTimers.get(cycleId); if (t) clearTimeout(t);
-  cycleTimers.set(cycleId, setTimeout(() => flushCycle(cycleId), CYCLE_DEBOUNCE_MS));
+function pushSprintSoon(sprintId) {
+  const t = sprintTimers.get(sprintId);
+  if (t) clearTimeout(t);
+  sprintTimers.set(
+    sprintId,
+    setTimeout(() => flushSprint(sprintId), SPRINT_DEBOUNCE_MS),
+  );
 }
 function pushEntrySoon(dateKey) {
-  const t = entryTimers.get(dateKey); if (t) clearTimeout(t);
-  entryTimers.set(dateKey, setTimeout(() => flushEntry(dateKey), ENTRY_DEBOUNCE_MS));
+  const t = entryTimers.get(dateKey);
+  if (t) clearTimeout(t);
+  entryTimers.set(
+    dateKey,
+    setTimeout(() => flushEntry(dateKey), ENTRY_DEBOUNCE_MS),
+  );
 }
 
-async function flushCycle(cycleId) {
-  cycleTimers.delete(cycleId);
-  delete state._dirtyCycleIds[cycleId];
-  const cycle = state.cyclesById[cycleId];
-  if (!cycle) return;
-  inflight++; bumpStatus(); render();
+async function flushSprint(sprintId) {
+  sprintTimers.delete(sprintId);
+  delete state._dirtySprintIds[sprintId];
+  const sprint = state.sprintsById[sprintId];
+  if (!sprint) return;
+  inflight++;
+  bumpStatus();
+  render();
   try {
-    const res = await fetch(`${API_CYCLE}/${encodeURIComponent(cycleId)}`, {
+    const res = await fetch(`${API_SPRINT}/${encodeURIComponent(sprintId)}`, {
       method: 'PUT',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        startDate: cycle.startDate,
-        endDate: cycle.endDate,
-        lengthDays: cycle.lengthDays,
-        pointStep: cycle.pointStep,
-        categories: cycle.categories || [],
-        habitDefinitions: cycle.habitDefinitions || [],
+        startDate: sprint.startDate,
+        endDate: sprint.endDate,
+        lengthDays: sprint.lengthDays,
+        pointStep: sprint.pointStep,
+        goalPoints: sprint.goalPoints,
+        categories: sprint.categories || [],
+        habitDefinitions: sprint.habitDefinitions || [],
       }),
     });
-    if (!res.ok) throw new Error('cycle ' + res.status);
+    if (!res.ok) throw new Error('sprint ' + res.status);
     try {
       const payload = await res.clone().json();
       if (payload && Array.isArray(payload.removedHabitIds) && payload.removedHabitIds.length) {
         applyOrphanSweepLocally(payload.removedHabitIds);
       }
     } catch (_) {}
-    state.cycleSummaries = null;
+    state.sprintSummaries = null;
     state.trendsCache = {};
   } catch (_) {
-    state._dirtyCycleIds[cycleId] = true;
-    inflight--; markError(); return;
+    state._dirtySprintIds[sprintId] = true;
+    inflight--;
+    markError();
+    return;
   }
-  inflight--; bumpStatus(); render();
+  inflight--;
+  bumpStatus();
+  render();
 }
 
 async function flushEntry(dateKey) {
@@ -76,7 +100,9 @@ async function flushEntry(dateKey) {
   const empty = !entry || Object.keys(entry.habitValuesById || {}).length === 0;
   delete state._dirtyEntryDates[dateKey];
   if (empty) state._deletedEntryDates = state._deletedEntryDates.filter((d) => d !== dateKey);
-  inflight++; bumpStatus(); render();
+  inflight++;
+  bumpStatus();
+  render();
   try {
     const res = await fetch(`${API_ENTRY}/${encodeURIComponent(dateKey)}`, {
       method: 'PUT',
@@ -89,22 +115,26 @@ async function flushEntry(dateKey) {
       const r = state.trendsCache[url];
       if (r && r.from <= dateKey && dateKey <= r.to) delete state.trendsCache[url];
     }
-    state.cycleSummaries = null;
+    state.sprintSummaries = null;
   } catch (_) {
     if (empty) {
       if (!state._deletedEntryDates.includes(dateKey)) state._deletedEntryDates.push(dateKey);
     } else {
       state._dirtyEntryDates[dateKey] = true;
     }
-    inflight--; markError(); return;
+    inflight--;
+    markError();
+    return;
   }
-  inflight--; bumpStatus(); render();
+  inflight--;
+  bumpStatus();
+  render();
 }
 
 // ── Lazy loaders ───────────────────────────────────────────────────────
 
 const inflightEntry = new Map();
-const inflightCycle = new Map();
+const inflightSprint = new Map();
 
 export async function loadEntry(dateKey) {
   if (state._loadedEntryDates.has(dateKey)) return state.entriesByDate[dateKey];
@@ -115,41 +145,47 @@ export async function loadEntry(dateKey) {
       if (!res.ok) throw new Error('entry ' + res.status);
       const data = await res.json();
       state.entriesByDate[dateKey] = {
-        habitValuesById: (data && data.habitValuesById) || {},
-        cycleId: (data && data.cycleId) || null,
+        habitValuesById: data?.habitValuesById || {},
+        sprintId: data?.sprintId || null,
       };
       state._loadedEntryDates.add(dateKey);
-      if (state.entriesByDate[dateKey].cycleId) {
-        await loadCycle(state.entriesByDate[dateKey].cycleId);
+      if (state.entriesByDate[dateKey].sprintId) {
+        await loadSprint(state.entriesByDate[dateKey].sprintId);
       }
       return state.entriesByDate[dateKey];
-    } finally { inflightEntry.delete(dateKey); }
+    } finally {
+      inflightEntry.delete(dateKey);
+    }
   })();
   inflightEntry.set(dateKey, p);
   return p;
 }
 
-export async function loadCycle(cycleId) {
-  if (cycleId == null) return null;
-  if (state._loadedCycleIds.has(cycleId)) return state.cyclesById[cycleId];
-  if (inflightCycle.has(cycleId)) return inflightCycle.get(cycleId);
+export async function loadSprint(sprintId) {
+  if (sprintId == null) return null;
+  if (state._loadedSprintIds.has(sprintId)) return state.sprintsById[sprintId];
+  if (inflightSprint.has(sprintId)) return inflightSprint.get(sprintId);
   const p = (async () => {
     try {
-      const res = await fetch(`${API_CYCLE}/${encodeURIComponent(cycleId)}`, { credentials: 'same-origin' });
+      const res = await fetch(`${API_SPRINT}/${encodeURIComponent(sprintId)}`, {
+        credentials: 'same-origin',
+      });
       if (!res.ok) return null;
-      const cycle = await res.json();
-      state.cyclesById[cycle.id] = cycle;
-      state._loadedCycleIds.add(cycle.id);
-      return cycle;
-    } finally { inflightCycle.delete(cycleId); }
+      const sprint = await res.json();
+      state.sprintsById[sprint.id] = sprint;
+      state._loadedSprintIds.add(sprint.id);
+      return sprint;
+    } finally {
+      inflightSprint.delete(sprintId);
+    }
   })();
-  inflightCycle.set(cycleId, p);
+  inflightSprint.set(sprintId, p);
   return p;
 }
 
-/** POST a new cycle. Body has all fields except id; server assigns the next integer. */
-export async function createCycle(template) {
-  const res = await fetch(API_CYCLE, {
+/** POST a new sprint. Body has all fields except id; server assigns the next integer. */
+export async function createSprint(template) {
+  const res = await fetch(API_SPRINT, {
     method: 'POST',
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
@@ -158,25 +194,26 @@ export async function createCycle(template) {
       endDate: template.endDate,
       lengthDays: template.lengthDays,
       pointStep: template.pointStep,
+      goalPoints: template.goalPoints,
       categories: template.categories || [],
       habitDefinitions: template.habitDefinitions || [],
     }),
   });
   if (!res.ok) return null;
-  const cycle = await res.json();
-  state.cyclesById[cycle.id] = cycle;
-  state._loadedCycleIds.add(cycle.id);
-  state.cycleSummaries = null;
-  return cycle;
+  const sprint = await res.json();
+  state.sprintsById[sprint.id] = sprint;
+  state._loadedSprintIds.add(sprint.id);
+  state.sprintSummaries = null;
+  return sprint;
 }
 
-export async function loadCycleSummaries() {
-  if (state.cycleSummaries) return state.cycleSummaries;
-  const res = await fetch(`${API_TREND}/cycle-summary`, { credentials: 'same-origin' });
+export async function loadSprintSummaries() {
+  if (state.sprintSummaries) return state.sprintSummaries;
+  const res = await fetch(`${API_TREND}/sprint-summary`, { credentials: 'same-origin' });
   if (!res.ok) throw new Error('summaries ' + res.status);
   const data = await res.json();
-  state.cycleSummaries = (data && data.summaries) || [];
-  return state.cycleSummaries;
+  state.sprintSummaries = data?.summaries || [];
+  return state.sprintSummaries;
 }
 
 export async function loadTrendUrl(url) {
@@ -204,38 +241,43 @@ function renderCloudUnavailable(reason) {
 }
 
 /**
- * Ensure today's covering cycle exists in the cloud. Used at boot when the entry's cycleId
- * is null (no cycle covers today yet). Loads the latest summary to clone categories/habits
- * forward, then POSTs a new cycle covering today.
+ * Ensure today's covering sprint exists in the cloud. Used at boot when the entry's
+ * sprintId is null (no sprint covers today yet). Loads the latest summary to clone
+ * categories/habits forward, then POSTs a new sprint covering today.
  */
-async function ensureCurrentCycle() {
-  if (state.currentCycleId) return;
+async function ensureCurrentSprint() {
+  if (state.currentSprintId) return;
   const today = todayKey();
   let template = null;
   try {
-    const summaries = await loadCycleSummaries();
-    if (summaries && summaries.length) {
+    const summaries = await loadSprintSummaries();
+    if (summaries?.length) {
       const latest = summaries[summaries.length - 1];
-      template = await loadCycle(latest.cycleId);
+      template = await loadSprint(latest.sprintId);
     }
   } catch (_) {}
-  const length = (template && template.lengthDays) || 14;
-  const pointStep = (template && template.pointStep) || 1;
+  const length = template?.lengthDays || DEFAULT_SPRINT_LENGTH_DAYS;
+  const pointStep = template?.pointStep || DEFAULT_POINT_STEP;
+  const goalPoints =
+    template && Number.isFinite(Number(template.goalPoints))
+      ? Number(template.goalPoints)
+      : DEFAULT_GOAL_POINTS;
   const categories = template ? clone(template.categories || []) : [];
   const habits = template ? clone(template.habitDefinitions || []) : [];
-  const newCycle = await createCycle({
+  const newSprint = await createSprint({
     startDate: today,
     endDate: addDaysKey(today, length - 1),
     lengthDays: length,
     pointStep,
+    goalPoints,
     categories,
     habitDefinitions: habits,
   });
-  if (!newCycle) return;
-  state.currentCycleId = newCycle.id;
+  if (!newSprint) return;
+  state.currentSprintId = newSprint.id;
   // Reflect on today's cached entry so the UI sees it immediately.
-  const todayEntry = state.entriesByDate[today] || { habitValuesById: {}, cycleId: null };
-  todayEntry.cycleId = newCycle.id;
+  const todayEntry = state.entriesByDate[today] || { habitValuesById: {}, sprintId: null };
+  todayEntry.sprintId = newSprint.id;
   state.entriesByDate[today] = todayEntry;
 }
 
@@ -244,8 +286,8 @@ export async function bootSync() {
   try {
     const today = todayKey();
     await loadEntry(today);
-    state.currentCycleId = state.entriesByDate[today].cycleId;
-    if (!state.currentCycleId) await ensureCurrentCycle();
+    state.currentSprintId = state.entriesByDate[today].sprintId;
+    if (!state.currentSprintId) await ensureCurrentSprint();
     state.cloudReady = true;
     setSyncStatus('ok');
     render();
@@ -256,7 +298,7 @@ export async function bootSync() {
 }
 
 export function initSync() {
-  registerPushers(pushCycleSoon, pushEntrySoon);
+  registerPushers(pushSprintSoon, pushEntrySoon);
   load();
   render();
   bootSync();
