@@ -4,6 +4,29 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.6] - 2026-05-18
+
+### Added
+
+- **Sprint name + description + retrospective.** Every sprint now carries optional `name` (≤80 chars), `description` (≤2000), and `retrospective` (≤5000) fields. Name and description are edited in the Plan tab sprint card; retrospective is edited in the new Trends → Sprint Overview view. Each is backward compatible — existing sprints read as empty strings until edited.
+- **Sprint name in Entry header.** When a sprint has a name, it renders above the date line on the Entry tab — gives daily context (e.g. "Hibernation Recovery") without taking real estate when unset.
+- **`canEditRetrospective(sprint, todayKey)` + `clampSprintText(value, max)`** helpers in `app/scripts/scoring.js`. Pure, testable. Lambda mirrors via `clampText` in `utils.js`.
+- **Tests.** 12 new test cases covering `canEditRetrospective` (past / current / first-day / upcoming / null) and `clampSprintText` (trim, slice, coerce, empty).
+
+### Changed
+
+- **Trends redesigned: two modes only.** `SPRINT OVERVIEW` (default) walks every sprint with prev/next — name, description, daily-points chart with goal line, summary stats, and editable retrospective. `ALL-TIME` plots one point per sprint at avg pts/day across the user's whole history, with a per-sprint legend. The four-mode switcher (sprint / month / year / all) is gone.
+- **Sprint summary row gains `name`.** Powers the All-Time chart's sprint labels without a per-sprint round trip. Invalidated when a sprint's name changes (`handlePutSprint` summary-invalidation gap caught in plan review and fixed).
+- **Text-edit focus preservation.** Sprint name/description/retrospective edits flow through a dedicated `input` event listener that updates state and debounces save **without re-rendering**. Going through the click pipeline would have rebuilt the DOM and dropped focus + cursor position on every keystroke.
+- **Retrospective gating (defense in depth).** UI disables the retro textarea on upcoming sprints; lambda also rejects retrospective edits with 400 when `body.startDate > today`.
+
+### Removed
+
+- **Trends month-mode endpoint** (`GET /api/trend/month/:yyyy-mm`) and its handler.
+- **Trends month + year modes** in the UI. `state.trendsMonth` and `state.trendsYear` removed.
+- **`isValidYyyymm` helper** in lambda utils (unused after month route removal).
+- **`todayYearMonth` / `todayYear` / `offsetMonth` helpers** in front-end handlers (dead code without month/year modes).
+
 ## [0.5] - 2026-05-07
 
 ### Added

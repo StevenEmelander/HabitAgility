@@ -1,3 +1,4 @@
+import { SPRINT_DESC_MAX, SPRINT_NAME_MAX } from './constants.js';
 import {
   POINT_STEPS,
   escapeHtml,
@@ -87,6 +88,26 @@ export function renderPlan() {
     ${warning}
     <div class="card plan-sprint-card">
       <div class="mono muted" style="font-size:10px;letter-spacing:0.07em;margin-bottom:6px">${sprintHead.toUpperCase()}</div>
+      <div class="col" style="gap:8px;margin-bottom:10px">
+        <input
+          type="text"
+          class="plan-input plan-sprint-name"
+          data-field="sprint-name"
+          data-sprint-id="${s.id}"
+          maxlength="${SPRINT_NAME_MAX}"
+          placeholder="Sprint name"
+          autocomplete="off"
+          autocapitalize="sentences"
+          value="${escapeHtml(s.name || '')}" />
+        <textarea
+          class="plan-input plan-sprint-desc"
+          data-field="sprint-description"
+          data-sprint-id="${s.id}"
+          maxlength="${SPRINT_DESC_MAX}"
+          rows="3"
+          placeholder="Description / intent for this sprint"
+          autocapitalize="sentences">${escapeHtml(s.description || '')}</textarea>
+      </div>
       <div class="row between" style="flex-wrap:wrap;gap:10px;align-items:flex-start">
         <div style="min-width:0">
           <div style="font-size:20px;font-weight:700;line-height:1.12">${fmtPointsForStep(goal, step)}<span class="muted" style="font-size:13px;font-weight:500"> goal/day</span></div>

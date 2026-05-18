@@ -12,7 +12,6 @@ const {
   clampToToday,
   daysBetweenInclusive,
   addDays,
-  isValidYyyymm,
   isValidSprintId,
   jsonResponse,
   plainResponse,
@@ -34,6 +33,7 @@ function summaryItemToObject(item) {
     days: item.days ? Number(item.days.N) : 0,
     goalPoints: item.goalPoints ? Number(item.goalPoints.N) : DEFAULT_GOAL_POINTS,
     goalTotal: item.goalTotal ? Number(item.goalTotal.N) : 0,
+    name: item.name ? item.name.S : '',
   };
 }
 
@@ -51,22 +51,19 @@ async function getSprintSummary(sprintId) {
 }
 
 async function putSprintSummary(s) {
-  await client.send(
-    new PutItemCommand({
-      TableName: ROWS_TABLE,
-      Item: {
-        pk: { S: PK_SPRINT_SUM },
-        dateKey: { S: String(s.sprintId) },
-        startDate: { S: s.startDate },
-        endDate: { S: s.endDate },
-        pts: { N: String(quantize(s.pts)) },
-        days: { N: String(s.days) },
-        goalPoints: { N: String(quantize(s.goalPoints != null ? s.goalPoints : DEFAULT_GOAL_POINTS)) },
-        goalTotal: { N: String(quantize(s.goalTotal || 0)) },
-        updatedAt: { S: nowIso() },
-      },
-    }),
-  );
+  const item = {
+    pk: { S: PK_SPRINT_SUM },
+    dateKey: { S: String(s.sprintId) },
+    startDate: { S: s.startDate },
+    endDate: { S: s.endDate },
+    pts: { N: String(quantize(s.pts)) },
+    days: { N: String(s.days) },
+    goalPoints: { N: String(quantize(s.goalPoints != null ? s.goalPoints : DEFAULT_GOAL_POINTS)) },
+    goalTotal: { N: String(quantize(s.goalTotal || 0)) },
+    updatedAt: { S: nowIso() },
+  };
+  if (s.name) item.name = { S: String(s.name) };
+  await client.send(new PutItemCommand({ TableName: ROWS_TABLE, Item: item }));
 }
 
 async function deleteSprintSummary(sprintId) {
@@ -107,6 +104,7 @@ async function computeSprintSummary(sprint) {
   const from = sprint.startDate;
   const to = clampToToday(sprint.endDate);
   const goalPoints = Number(sprint.goalPoints) || DEFAULT_GOAL_POINTS;
+  const name = sprint.name || '';
   if (from > to) {
     return {
       sprintId: sprint.id,
@@ -116,6 +114,7 @@ async function computeSprintSummary(sprint) {
       days: 0,
       goalPoints,
       goalTotal: 0,
+      name,
     };
   }
   const entries = await queryEntriesBetween(from, to);
@@ -131,6 +130,7 @@ async function computeSprintSummary(sprint) {
     days,
     goalPoints,
     goalTotal,
+    name,
   };
 }
 
@@ -162,19 +162,6 @@ async function handleTrendSprintDetail(sprintId) {
   return jsonResponse(200, { from, to, buckets: await buildDailyBuckets(from, to, [sprint]) });
 }
 
-async function handleTrendMonth(yyyymm) {
-  if (!isValidYyyymm(yyyymm)) return plainResponse(400, 'Invalid month');
-  const [y, m] = yyyymm.split('-').map(Number);
-  const first = `${yyyymm}-01`;
-  const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  const last = `${yyyymm}-${String(lastDay).padStart(2, '0')}`;
-  const from = first;
-  const to = clampToToday(last);
-  if (from > to) return jsonResponse(200, { from, to: from, buckets: [] });
-  const sprints = await queryAllSprintDefs();
-  return jsonResponse(200, { from, to, buckets: await buildDailyBuckets(from, to, sprints) });
-}
-
 async function handleTrendSprintSummary() {
   const [sprints, cached] = await Promise.all([queryAllSprintDefs(), queryAllSprintSummaries()]);
   const missing = sprints.filter((s) => s && s.id != null && !cached.has(s.id));
@@ -204,6 +191,5 @@ module.exports = {
   computeSprintSummary,
   buildDailyBuckets,
   handleTrendSprintDetail,
-  handleTrendMonth,
   handleTrendSprintSummary,
 };

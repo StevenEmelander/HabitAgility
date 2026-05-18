@@ -40,8 +40,10 @@ export function renderEntry() {
         .toUpperCase();
   const loaded = state._loadedEntryDates.has(dk);
   const fillPct = goal > 0 ? Math.min(100, (pts / goal) * 100) : 0;
+  const sprintName = s?.name ? `<div class="entry-sprint-name">${escapeHtml(s.name)}</div>` : '';
   return `
     <div class="card">
+      ${sprintName}
       <div class="row between" style="flex-wrap:wrap;gap:8px;align-items:center">
         <button class="btn" type="button" data-action="day-prev" aria-label="Previous day">←</button>
         <div class="col center" style="flex:1;min-width:0">

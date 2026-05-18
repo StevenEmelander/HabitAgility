@@ -34,6 +34,17 @@ function quantize(v) {
   return Math.round((Number(v) || 0) * 100) / 100;
 }
 
+// ── Strings ───────────────────────────────────────────────────────────
+
+// Coerce to string, strip leading/trailing whitespace, slice to max length.
+// Used for user-controlled sprint metadata (name/description/retrospective)
+// as the lambda's defense-in-depth clamp.
+function clampText(value, max) {
+  if (value == null) return '';
+  const s = String(value).trim();
+  return s.length > max ? s.slice(0, max) : s;
+}
+
 // ── HTTP response helpers ─────────────────────────────────────────────
 
 function jsonResponse(statusCode, obj) {
@@ -77,9 +88,6 @@ function safeJsonParseObject(s) {
 function isValidDateKey(s) {
   return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
 }
-function isValidYyyymm(s) {
-  return typeof s === 'string' && /^\d{4}-\d{2}$/.test(s);
-}
 function isValidSprintId(v) {
   return Number.isInteger(v) && v >= 1;
 }
@@ -96,12 +104,12 @@ module.exports = {
   daysBetweenInclusive,
   clampToToday,
   quantize,
+  clampText,
   jsonResponse,
   plainResponse,
   getBody,
   safeJsonParseObject,
   isValidDateKey,
-  isValidYyyymm,
   isValidSprintId,
   parseSprintIdParam,
 };

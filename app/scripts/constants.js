@@ -20,6 +20,13 @@ export const DEFAULT_POINT_STEP = 1;
 export const SPRINT_DEBOUNCE_MS = 1500;
 export const ENTRY_DEBOUNCE_MS = 1500;
 
+// ── Sprint metadata length caps ───────────────────────────────────────
+// Mirror of the lambda-side caps in infrastructure/lambdas/sync/constants.js.
+// UI enforces via maxlength + clampSprintText; lambda re-clamps as defense in depth.
+export const SPRINT_NAME_MAX = 80;
+export const SPRINT_DESC_MAX = 2000;
+export const SPRINT_RETRO_MAX = 5000;
+
 // ── API base paths ────────────────────────────────────────────────────
 
 export const API_SPRINT = '/api/sprint';

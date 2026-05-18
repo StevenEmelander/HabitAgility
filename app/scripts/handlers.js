@@ -9,10 +9,12 @@
  * the top of this file (date math, ensure-loaded plumbing, plan-mode sprint resolver).
  */
 
-import { API_TREND } from './constants.js';
+import { API_TREND, SPRINT_DESC_MAX, SPRINT_NAME_MAX, SPRINT_RETRO_MAX } from './constants.js';
 import {
   POINT_STEPS,
   addDaysKey,
+  canEditRetrospective,
+  clampSprintText,
   clone,
   getCurrentSprint,
   getEntry,
@@ -35,21 +37,6 @@ import {
 } from './core.js';
 import { bootSync, createSprint, loadEntry, loadSprint, loadSprintSummaries, loadTrendUrl } from './sync.js';
 
-// ── Date helpers ──────────────────────────────────────────────────────
-
-function todayYearMonth() {
-  return todayKey().slice(0, 7);
-}
-function todayYear() {
-  return new Date().getFullYear();
-}
-
-function offsetMonth(yyyymm, delta) {
-  const [y, m] = yyyymm.split('-').map(Number);
-  const d = new Date(Date.UTC(y, m - 1 + delta, 1));
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-}
-
 // ── View / data loading ───────────────────────────────────────────────
 
 /** Load the right data for whatever's currently in state.tab + state.trendsMode. */
@@ -63,21 +50,16 @@ async function ensureViewLoaded() {
     return;
   }
   if (state.tab === 'trends') {
-    if (state.trendsMode === 'sprint') {
-      const id = state.trendsSprintId || state.currentSprintId;
-      if (id != null) {
-        state.trendsSprintId = id;
-        await loadTrendUrl(`${API_TREND}/sprint/${encodeURIComponent(id)}`);
-        await loadSprint(id);
-      }
-    } else if (state.trendsMode === 'month') {
-      const yyyymm = state.trendsMonth || todayYearMonth();
-      state.trendsMonth = yyyymm;
-      await loadTrendUrl(`${API_TREND}/month/${encodeURIComponent(yyyymm)}`);
-    } else {
-      // year + all-time both use the sprint-summary endpoint.
+    if (state.trendsMode === 'all') {
       await loadSprintSummaries();
-      if (state.trendsMode === 'year' && state.trendsYear == null) state.trendsYear = todayYear();
+      return;
+    }
+    // Sprint Overview (default): fetch daily buckets + full sprint def (for
+    // name/description/retrospective; summary only carries name).
+    const id = state.trendsSprintId || state.currentSprintId;
+    if (id != null) {
+      state.trendsSprintId = id;
+      await Promise.all([loadTrendUrl(`${API_TREND}/sprint/${encodeURIComponent(id)}`), loadSprint(id)]);
     }
   }
 }
@@ -108,6 +90,10 @@ async function ensurePlanSprintLoaded() {
     lengthDays: cur.lengthDays,
     pointStep: cur.pointStep,
     goalPoints: cur.goalPoints,
+    // Metadata does not inherit — each sprint starts blank.
+    name: '',
+    description: '',
+    retrospective: '',
     categories: clone(cur.categories || []),
     habitDefinitions: clone(cur.habitDefinitions || []),
   });
@@ -257,37 +243,24 @@ function entryHabitFor(habitId) {
 const trendsActions = {
   'trends-mode': ({ target }) => {
     const m = target.dataset.mode;
-    if (!['sprint', 'month', 'year', 'all'].includes(m)) return;
+    if (m !== 'sprint' && m !== 'all') return;
     state.trendsMode = m;
-    if (m === 'sprint') state.trendsSprintId = state.currentSprintId;
-    if (m === 'month') state.trendsMonth = todayYearMonth();
-    if (m === 'year') state.trendsYear = todayYear();
+    if (m === 'sprint' && state.trendsSprintId == null) state.trendsSprintId = state.currentSprintId;
     render();
     ensureLoadedThenRender();
   },
   'trends-prev': () => {
-    if (state.trendsMode === 'sprint' && state.trendsSprintId > 1) {
-      state.trendsSprintId -= 1;
-    } else if (state.trendsMode === 'month') {
-      state.trendsMonth = offsetMonth(state.trendsMonth || todayYearMonth(), -1);
-    } else if (state.trendsMode === 'year') {
-      state.trendsYear = (state.trendsYear || todayYear()) - 1;
-    } else {
-      return;
-    }
+    // Only Sprint Overview navigates; All-Time is static.
+    if (state.trendsMode !== 'sprint') return;
+    const cur = state.trendsSprintId || state.currentSprintId || 1;
+    if (cur <= 1) return;
+    state.trendsSprintId = cur - 1;
     render();
     ensureLoadedThenRender();
   },
   'trends-next': () => {
-    if (state.trendsMode === 'sprint') {
-      state.trendsSprintId = (state.trendsSprintId || state.currentSprintId) + 1;
-    } else if (state.trendsMode === 'month') {
-      state.trendsMonth = offsetMonth(state.trendsMonth || todayYearMonth(), 1);
-    } else if (state.trendsMode === 'year') {
-      state.trendsYear = (state.trendsYear || todayYear()) + 1;
-    } else {
-      return;
-    }
+    if (state.trendsMode !== 'sprint') return;
+    state.trendsSprintId = (state.trendsSprintId || state.currentSprintId || 1) + 1;
     render();
     ensureLoadedThenRender();
   },
@@ -468,6 +441,33 @@ function findHandler(action) {
   );
 }
 
+// ── Text-field input dispatch ─────────────────────────────────────────
+// Sprint name/description/retrospective edit through `input` events, NOT clicks.
+// Going through the click pipeline would re-render the DOM on every keystroke and
+// lose focus + cursor position in the textarea. These handlers update state and
+// debounce-save without calling render().
+
+const TEXT_FIELDS = {
+  'sprint-name': { prop: 'name', max: SPRINT_NAME_MAX, gateRetro: false },
+  'sprint-description': { prop: 'description', max: SPRINT_DESC_MAX, gateRetro: false },
+  'sprint-retrospective': { prop: 'retrospective', max: SPRINT_RETRO_MAX, gateRetro: true },
+};
+
+function handleSprintTextInput(target) {
+  const field = target.getAttribute('data-field');
+  const spec = TEXT_FIELDS[field];
+  if (!spec) return;
+  const sprintIdRaw = target.getAttribute('data-sprint-id');
+  const sprintId = Number(sprintIdRaw);
+  if (!Number.isFinite(sprintId)) return;
+  const sprint = getSprintById(sprintId);
+  if (!sprint) return;
+  if (spec.gateRetro && !canEditRetrospective(sprint, todayKey())) return;
+  sprint[spec.prop] = clampSprintText(target.value, spec.max);
+  pushSprint(sprint.id);
+  // Intentionally NO render() — keeps focus + cursor position in the field.
+}
+
 export function setupHandlers() {
   document.body.addEventListener('click', (event) => {
     const target = event.target.closest('[data-action]');
@@ -492,5 +492,13 @@ export function setupHandlers() {
       delta: Number.parseFloat(target.dataset.delta || '0'),
     };
     handler(ctx);
+  });
+
+  document.body.addEventListener('input', (event) => {
+    if (!state.cloudReady) return;
+    const target = event.target;
+    if (!target || !target.matches) return;
+    if (!target.matches('[data-field][data-sprint-id]')) return;
+    handleSprintTextInput(target);
   });
 }

@@ -1,6 +1,13 @@
 const { GetItemCommand, PutItemCommand, QueryCommand } = require('@aws-sdk/client-dynamodb');
 const { client } = require('./db');
-const { ROWS_TABLE, PK_SPRINT_DEF, DEFAULT_GOAL_POINTS } = require('./constants');
+const {
+  ROWS_TABLE,
+  PK_SPRINT_DEF,
+  DEFAULT_GOAL_POINTS,
+  SPRINT_NAME_MAX,
+  SPRINT_DESC_MAX,
+  SPRINT_RETRO_MAX,
+} = require('./constants');
 const {
   nowIso,
   safeJsonParseObject,
@@ -8,6 +15,8 @@ const {
   isValidSprintId,
   jsonResponse,
   plainResponse,
+  clampText,
+  todayKey,
 } = require('./utils');
 const { claimNextSprintId } = require('./meta');
 
@@ -22,6 +31,9 @@ function sprintItemToObject(item) {
     lengthDays: item.lengthDays ? Number(item.lengthDays.N) : 0,
     pointStep: item.pointStep ? Number(item.pointStep.N) : undefined,
     goalPoints: item.goalPoints ? Number(item.goalPoints.N) : DEFAULT_GOAL_POINTS,
+    name: item.name ? item.name.S : '',
+    description: item.description ? item.description.S : '',
+    retrospective: item.retrospective ? item.retrospective.S : '',
     categories: body.categories || [],
     habitDefinitions: body.habitDefinitions || [],
   };
@@ -42,6 +54,13 @@ function sprintObjectToItem(s) {
   if (s.pointStep != null) item.pointStep = { N: String(Number(s.pointStep) || 1) };
   const goal = Number(s.goalPoints);
   item.goalPoints = { N: String(Number.isFinite(goal) && goal >= 0 ? goal : DEFAULT_GOAL_POINTS) };
+  // Optional string metadata — write only when non-empty (mirror pointStep).
+  const name = clampText(s.name, SPRINT_NAME_MAX);
+  if (name) item.name = { S: name };
+  const description = clampText(s.description, SPRINT_DESC_MAX);
+  if (description) item.description = { S: description };
+  const retrospective = clampText(s.retrospective, SPRINT_RETRO_MAX);
+  if (retrospective) item.retrospective = { S: retrospective };
   return item;
 }
 
@@ -107,6 +126,16 @@ async function handlePutSprint(sprintId, body) {
   const oldSprint = await getSprintDef(sprintId);
   if (!oldSprint) return plainResponse(404, 'Sprint not found');
 
+  // Defense in depth: retrospective only editable once the sprint has started.
+  // (UI also gates this; lambda enforces in case of direct API use.)
+  const incomingRetro = body.retrospective;
+  if (incomingRetro != null && incomingRetro !== oldSprint.retrospective) {
+    const today = todayKey();
+    if (body.startDate > today) {
+      return plainResponse(400, 'Retrospective not editable on upcoming sprint');
+    }
+  }
+
   const updated = {
     id: sprintId,
     startDate: body.startDate,
@@ -114,6 +143,9 @@ async function handlePutSprint(sprintId, body) {
     lengthDays: body.lengthDays,
     pointStep: body.pointStep,
     goalPoints: body.goalPoints,
+    name: clampText(body.name, SPRINT_NAME_MAX),
+    description: clampText(body.description, SPRINT_DESC_MAX),
+    retrospective: clampText(body.retrospective, SPRINT_RETRO_MAX),
     categories: body.categories || [],
     habitDefinitions: body.habitDefinitions || [],
   };
@@ -157,6 +189,13 @@ async function handlePutSprint(sprintId, body) {
     await restampSprintIds(allSprints, lo, hi);
   }
 
+  // Name flows into the summary row (so All-Time chart can label sprints
+  // without per-sprint fetches). Pure name edits don't hit the
+  // orphan-sweep or date-change branches above, so invalidate explicitly.
+  if (oldSprint.name !== updated.name) {
+    affectedSprintIds.add(sprintId);
+  }
+
   await Promise.all([...affectedSprintIds].map(deleteSprintSummary));
   return jsonResponse(200, { ok: true, removedHabitIds });
 }
@@ -173,6 +212,9 @@ async function handlePostSprint(body) {
     lengthDays: body.lengthDays,
     pointStep: body.pointStep,
     goalPoints: body.goalPoints,
+    name: clampText(body.name, SPRINT_NAME_MAX),
+    description: clampText(body.description, SPRINT_DESC_MAX),
+    retrospective: clampText(body.retrospective, SPRINT_RETRO_MAX),
     categories: body.categories || [],
     habitDefinitions: body.habitDefinitions || [],
   };

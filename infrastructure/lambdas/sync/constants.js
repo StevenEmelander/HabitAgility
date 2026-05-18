@@ -17,6 +17,12 @@ const META_ROW_ID = USER_ID;
 
 const DEFAULT_GOAL_POINTS = 10;
 
+// ── Sprint metadata length caps ───────────────────────────────────────
+// Enforced both client-side (UI maxlength) and server-side (defense in depth).
+const SPRINT_NAME_MAX = 80;
+const SPRINT_DESC_MAX = 2000;
+const SPRINT_RETRO_MAX = 5000;
+
 module.exports = {
   META_TABLE,
   ROWS_TABLE,
@@ -28,4 +34,7 @@ module.exports = {
   PK_SPRINT_SUM,
   META_ROW_ID,
   DEFAULT_GOAL_POINTS,
+  SPRINT_NAME_MAX,
+  SPRINT_DESC_MAX,
+  SPRINT_RETRO_MAX,
 };

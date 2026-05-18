@@ -11,7 +11,9 @@ import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_GOAL_POINTS, DEFAULT_POINT_STEP, POINT_STEPS } from '../app/scripts/constants.js';
 import {
+  canEditRetrospective,
   categoryPoints,
+  clampSprintText,
   decimalsForStep,
   fmtPoints,
   fmtPointsForStep,
@@ -209,5 +211,60 @@ describe('goalForSprint', () => {
     expect(goalForSprint({ goalPoints: 12 })).toBe(12);
     expect(goalForSprint({ goalPoints: 0 })).toBe(0);
     expect(goalForSprint({ goalPoints: 7.5 })).toBe(7.5);
+  });
+});
+
+describe('canEditRetrospective', () => {
+  const today = '2026-05-18';
+  it('returns true for past sprints', () => {
+    expect(canEditRetrospective({ startDate: '2026-04-01', endDate: '2026-04-14' }, today)).toBe(true);
+  });
+
+  it('returns true for the current sprint', () => {
+    expect(canEditRetrospective({ startDate: '2026-05-12', endDate: '2026-05-25' }, today)).toBe(true);
+  });
+
+  it('returns true when today exactly equals startDate (first day)', () => {
+    expect(canEditRetrospective({ startDate: today, endDate: '2026-05-31' }, today)).toBe(true);
+  });
+
+  it('returns false for upcoming sprints (startDate in the future)', () => {
+    expect(canEditRetrospective({ startDate: '2026-06-01', endDate: '2026-06-14' }, today)).toBe(false);
+  });
+
+  it('returns false for null / undefined / missing startDate', () => {
+    expect(canEditRetrospective(null, today)).toBe(false);
+    expect(canEditRetrospective(undefined, today)).toBe(false);
+    expect(canEditRetrospective({}, today)).toBe(false);
+    expect(canEditRetrospective({ startDate: null }, today)).toBe(false);
+  });
+});
+
+describe('clampSprintText', () => {
+  it('returns empty string for null / undefined', () => {
+    expect(clampSprintText(null, 10)).toBe('');
+    expect(clampSprintText(undefined, 10)).toBe('');
+  });
+
+  it('trims leading and trailing whitespace', () => {
+    expect(clampSprintText('  hello  ', 80)).toBe('hello');
+    expect(clampSprintText('\n\ntext\n', 80)).toBe('text');
+  });
+
+  it('slices to max length', () => {
+    expect(clampSprintText('abcdefghij', 5)).toBe('abcde');
+  });
+
+  it('preserves exact-max strings untouched', () => {
+    expect(clampSprintText('abcde', 5)).toBe('abcde');
+  });
+
+  it('coerces non-strings via String()', () => {
+    expect(clampSprintText(42, 80)).toBe('42');
+  });
+
+  it('handles empty / whitespace-only input', () => {
+    expect(clampSprintText('', 80)).toBe('');
+    expect(clampSprintText('   ', 80)).toBe('');
   });
 });

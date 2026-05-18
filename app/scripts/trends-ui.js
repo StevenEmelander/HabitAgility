@@ -1,8 +1,11 @@
+import { SPRINT_RETRO_MAX, TRENDS_CHART_MAX_POINTS } from './constants.js';
 import {
   API_TREND,
+  canEditRetrospective,
   escapeHtml,
   fmtPointsForStep,
   getCurrentSprint,
+  getSprintById,
   goalForSprint,
   pointStep,
   state,
@@ -35,7 +38,7 @@ function buildLineChart(data, avg, dayCeiling, refY) {
 
 /** Downsample a buckets array (server-supplied) to at most maxPts chart points. */
 function downsample(buckets, maxPts) {
-  const cap = maxPts || 120;
+  const cap = maxPts || TRENDS_CHART_MAX_POINTS;
   if (buckets.length <= cap) return buckets.slice();
   const bucket = Math.ceil(buckets.length / cap);
   const out = [];
@@ -49,134 +52,184 @@ function downsample(buckets, maxPts) {
   return out;
 }
 
-function pickTrendsSource() {
-  if (state.trendsMode === 'sprint') {
-    const id = state.trendsSprintId || state.currentSprintId;
-    if (id == null) return null;
-    return { kind: 'daily', url: `${API_TREND}/sprint/${encodeURIComponent(id)}`, label: `SPRINT ${id}` };
-  }
-  if (state.trendsMode === 'month') {
-    const yyyymm = state.trendsMonth || todayKey().slice(0, 7);
-    const [y, m] = yyyymm.split('-').map(Number);
-    const labelDate = new Date(Date.UTC(y, m - 1, 1));
-    const label = labelDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }).toUpperCase();
-    return { kind: 'daily', url: `${API_TREND}/month/${encodeURIComponent(yyyymm)}`, label };
-  }
-  if (state.trendsMode === 'year') {
-    const yr = state.trendsYear || new Date().getFullYear();
-    return { kind: 'summaries', filter: 'year', year: yr, label: String(yr) };
-  }
-  return { kind: 'summaries', filter: 'all', label: 'ALL TIME' };
-}
+// ── Sprint Overview ──────────────────────────────────────────────────
 
-export function renderTrends() {
+/**
+ * Render the focused-sprint overview: name, description, daily-points chart, stats,
+ * retrospective textarea, and prev/next navigation.
+ */
+function renderSprintOverview() {
   const cur = getCurrentSprint();
-  const step = pointStep(cur);
-  const source = pickTrendsSource();
-  const mode = state.trendsMode;
-
-  let label = 'TRENDS';
-  let from = '';
-  let to = '';
-  let buckets = []; // {key, pts, goal, days}
-  let loaded = false;
-
-  if (!source) {
-    label = 'TRENDS';
-  } else if (source.kind === 'daily') {
-    label = source.label;
-    const cached = state.trendsCache[source.url];
-    if (cached) {
-      loaded = true;
-      from = cached.from;
-      to = cached.to;
-      buckets = (cached.buckets || []).slice();
-    }
-  } else {
-    label = source.label;
-    const summaries = state.sprintSummaries;
-    if (summaries) {
-      loaded = true;
-      let pool = summaries;
-      if (source.filter === 'year') {
-        const y = String(source.year);
-        pool = summaries.filter((s) => (s.startDate || '').startsWith(y) || (s.endDate || '').startsWith(y));
-      }
-      buckets = pool.map((s) => ({
-        key: s.startDate,
-        pts: Number(s.pts) || 0,
-        goal: Number(s.goalTotal) || 0,
-        days: Number(s.days) || 1,
-        sprintId: s.sprintId,
-        endDate: s.endDate,
-      }));
-      if (buckets.length) {
-        from = buckets[0].key;
-        to = buckets[buckets.length - 1].endDate || buckets[buckets.length - 1].key;
-      }
-    }
+  const focusedId = state.trendsSprintId || state.currentSprintId;
+  const sprint = getSprintById(focusedId) || cur;
+  if (!sprint) {
+    return `<div class="card"><div class="muted" style="padding:12px 0">No sprint to show yet.</div></div>`;
   }
+  const step = pointStep(sprint);
+  const url = `${API_TREND}/sprint/${encodeURIComponent(sprint.id)}`;
+  const cached = state.trendsCache[url];
+  const loaded = !!cached;
+  const buckets = loaded ? (cached.buckets || []).slice() : [];
 
   const sumPts = buckets.reduce((s, b) => s + (b.pts || 0), 0);
-  const sumGoal = buckets.reduce((s, b) => s + (b.goal || 0), 0);
   const totalDays = buckets.reduce((s, b) => s + (b.days || 1), 0) || 1;
   const avgPerDay = sumPts / totalDays;
-  const avgPctOfGoal = sumGoal ? (sumPts / sumGoal) * 100 : 0;
-
-  // Per-bucket avg points/day for the chart Y-axis.
   const chartPts = buckets.map((b) => ({ key: b.key, pts: b.days ? b.pts / b.days : b.pts }));
-  const chartPct = buckets.map((b) => ({ key: b.key, pts: b.goal ? (b.pts / b.goal) * 100 : 0 }));
   const ceilingDayPts = buckets.length
     ? Math.max(...buckets.map((b) => (b.days ? b.pts / b.days : b.pts)), 1)
     : 1;
-  const chartDataPts = downsample(chartPts, 120).map((b) => ({ date: b.key, pts: b.pts }));
-  const chartDataPct = downsample(chartPct, 120).map((b) => ({ date: b.key, pts: b.pts }));
+  const chartDataPts = downsample(chartPts, TRENDS_CHART_MAX_POINTS).map((b) => ({
+    date: b.key,
+    pts: b.pts,
+  }));
+  const goalLine = goalForSprint(sprint);
 
-  // Goal reference for the points chart: sprint/month uses focused sprint's daily goal;
-  // year/all-time uses the current sprint's goal as a representative line.
-  const goalLine = goalForSprint(cur);
+  // Prev/next: walk by sprint id (server allocates sequential integers).
+  const prevId = sprint.id - 1;
+  const nextId = sprint.id + 1;
+  const prevOk = prevId >= 1;
+  const nextOk = !!getSprintById(nextId) || nextId <= (cur?.id || 0);
 
-  const prevOk = mode !== 'all' && (mode !== 'sprint' || (state.trendsSprintId || 0) > 1);
-  const nextOk = mode !== 'all';
+  const name = sprint.name || '';
+  const description = sprint.description || '';
+  const retro = sprint.retrospective || '';
+  const canEditRetro = canEditRetrospective(sprint, todayKey());
 
-  const metricsBlock = `<div class="grid-metrics">
-      <div class="card"><div class="mono muted">POINTS</div><div class="stat" style="font-size:24px">${fmtPointsForStep(sumPts, step)}</div><div class="mono muted">/ ${fmtPointsForStep(sumGoal, step)} goal</div></div>
-      <div class="card"><div class="mono muted">AVG / DAY</div><div class="stat" style="font-size:24px">${avgPerDay.toFixed(1)}</div><div class="mono muted">pts (goal ${fmtPointsForStep(goalLine, step)})</div></div>
-    </div>`;
-  const chartsBlock = !buckets.length
-    ? '<div class="card"><div class="muted" style="padding:12px 0">No data for this period.</div></div>'
+  const header = `<div class="card">
+    <div class="row between" style="gap:8px;align-items:center;margin-bottom:6px">
+      <button class="btn" type="button" data-action="trends-prev" ${prevOk ? '' : 'disabled'} aria-label="Previous sprint">←</button>
+      <div class="mono muted" style="font-size:11px;letter-spacing:0.07em">SPRINT ${sprint.id}</div>
+      <button class="btn" type="button" data-action="trends-next" ${nextOk ? '' : 'disabled'} aria-label="Next sprint">→</button>
+    </div>
+    <div class="trends-sprint-title ${name ? '' : 'empty'}">${name ? escapeHtml(name) : 'Untitled sprint'}</div>
+    <div class="trends-sprint-dates">${sprint.startDate} → ${sprint.endDate} · ${sprint.lengthDays} days</div>
+    ${description ? `<div class="trends-sprint-desc">${escapeHtml(description)}</div>` : '<div class="trends-sprint-desc empty">No description.</div>'}
+  </div>`;
+
+  const metrics = `<div class="grid-metrics">
+    <div class="card"><div class="mono muted">POINTS</div><div class="stat" style="font-size:24px">${fmtPointsForStep(sumPts, step)}</div><div class="mono muted">over ${totalDays} day${totalDays === 1 ? '' : 's'}</div></div>
+    <div class="card"><div class="mono muted">AVG / DAY</div><div class="stat" style="font-size:24px">${avgPerDay.toFixed(1)}</div><div class="mono muted">goal ${fmtPointsForStep(goalLine, step)}</div></div>
+  </div>`;
+
+  const chart = !buckets.length
+    ? `<div class="card"><div class="muted" style="padding:12px 0">${loaded ? 'No data for this sprint yet.' : 'Loading…'}</div></div>`
     : `<div class="card">
         <div class="row between" style="margin-bottom:8px;gap:8px;align-items:baseline">
-          <div class="mono muted">AVG POINTS / DAY (${buckets.length})</div>
+          <div class="mono muted">DAILY POINTS</div>
           <div class="mono muted" style="font-size:11px">avg ${avgPerDay.toFixed(1)} · goal ${fmtPointsForStep(goalLine, step)}</div>
         </div>
         ${buildLineChart(chartDataPts, avgPerDay, ceilingDayPts, goalLine)}
-      </div>
-      <div class="card">
-        <div class="row between" style="margin-bottom:8px;gap:8px;align-items:baseline">
-          <div class="mono muted">PERCENT OF GOAL (${buckets.length})</div>
-          <div class="mono muted" style="font-size:11px">avg ${avgPctOfGoal.toFixed(1)}%</div>
-        </div>
-        ${buildLineChart(chartDataPct, avgPctOfGoal, 100, 100)}
       </div>`;
+
+  const retroLabel = canEditRetro
+    ? 'RETROSPECTIVE'
+    : 'RETROSPECTIVE (UPCOMING — UNLOCKS WHEN THE SPRINT STARTS)';
+  const retroPlaceholder = canEditRetro
+    ? 'What worked? What didn’t? What to carry forward?'
+    : 'This sprint hasn’t started yet.';
+  const retroBlock = `<div class="card">
+    <div class="trends-retro-label">${retroLabel}</div>
+    <textarea
+      class="trends-retro-input"
+      data-field="sprint-retrospective"
+      data-sprint-id="${sprint.id}"
+      maxlength="${SPRINT_RETRO_MAX}"
+      placeholder="${retroPlaceholder}"
+      ${canEditRetro ? '' : 'disabled'}
+      autocapitalize="sentences">${escapeHtml(retro)}</textarea>
+  </div>`;
+
+  return `${header}${metrics}${chart}${retroBlock}`;
+}
+
+// ── All-Time ──────────────────────────────────────────────────────────
+
+/** Render the all-time chart — one point per sprint at its avg pts/day. */
+function renderAllTime() {
+  const cur = getCurrentSprint();
+  const step = pointStep(cur);
+  const summaries = state.sprintSummaries;
+  if (!summaries) {
+    return `<div class="card"><div class="muted" style="padding:12px 0">Loading…</div></div>`;
+  }
+  if (!summaries.length) {
+    return `<div class="card"><div class="muted" style="padding:12px 0">No sprints yet.</div></div>`;
+  }
+
+  // One data point per sprint at avg pts/day.
+  const buckets = summaries.map((s) => {
+    const days = Number(s.days) || 1;
+    const pts = Number(s.pts) || 0;
+    return {
+      key: s.startDate,
+      pts: pts / days,
+      days,
+      sprintId: s.sprintId,
+      name: s.name || '',
+      endDate: s.endDate,
+      totalPts: pts,
+    };
+  });
+
+  const totalPtsAcross = buckets.reduce((s, b) => s + (b.totalPts || 0), 0);
+  const totalDaysAcross = buckets.reduce((s, b) => s + (b.days || 1), 0) || 1;
+  const lifetimeAvg = totalPtsAcross / totalDaysAcross;
+  const ceilingDayPts = Math.max(...buckets.map((b) => b.pts), 1);
+  const chartData = downsample(buckets, TRENDS_CHART_MAX_POINTS).map((b) => ({
+    date: b.key,
+    pts: b.pts,
+  }));
+  const goalLine = goalForSprint(cur);
+
+  const header = `<div class="card">
+    <div class="row between" style="gap:8px;align-items:center">
+      <div class="mono" style="font-size:15px;letter-spacing:0.05em">ALL-TIME</div>
+      <div class="mono muted" style="font-size:11px">${buckets.length} sprint${buckets.length === 1 ? '' : 's'}</div>
+    </div>
+  </div>`;
+
+  const metrics = `<div class="grid-metrics">
+    <div class="card"><div class="mono muted">POINTS</div><div class="stat" style="font-size:24px">${fmtPointsForStep(totalPtsAcross, step)}</div><div class="mono muted">across all sprints</div></div>
+    <div class="card"><div class="mono muted">AVG / DAY</div><div class="stat" style="font-size:24px">${lifetimeAvg.toFixed(1)}</div><div class="mono muted">goal ${fmtPointsForStep(goalLine, step)}</div></div>
+  </div>`;
+
+  const chart = `<div class="card">
+    <div class="row between" style="margin-bottom:8px;gap:8px;align-items:baseline">
+      <div class="mono muted">AVG POINTS / DAY PER SPRINT</div>
+      <div class="mono muted" style="font-size:11px">avg ${lifetimeAvg.toFixed(1)} · goal ${fmtPointsForStep(goalLine, step)}</div>
+    </div>
+    ${buildLineChart(chartData, lifetimeAvg, ceilingDayPts, goalLine)}
+  </div>`;
+
+  // Short legend listing each sprint by name (or "Sprint N" fallback).
+  const legendItems = buckets
+    .map((b) => {
+      const label = b.name ? escapeHtml(b.name) : `Sprint ${b.sprintId}`;
+      const avg = b.pts.toFixed(1);
+      return `<div class="row between" style="gap:8px;padding:4px 0;border-bottom:1px solid var(--border)">
+        <div style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${label}</div>
+        <div class="mono muted" style="font-size:11px;flex-shrink:0">${avg}/day</div>
+      </div>`;
+    })
+    .join('');
+  const legend = `<div class="card">
+    <div class="mono muted" style="margin-bottom:6px">SPRINTS</div>
+    ${legendItems}
+  </div>`;
+
+  return `${header}${metrics}${chart}${legend}`;
+}
+
+// ── Entry point ──────────────────────────────────────────────────────
+
+export function renderTrends() {
+  const mode = state.trendsMode === 'all' ? 'all' : 'sprint';
+  const body = mode === 'all' ? renderAllTime() : renderSprintOverview();
   return `
     <div class="row" style="margin-bottom:12px;flex-wrap:wrap;gap:8px">
-      <button class="btn ${mode === 'sprint' ? 'primary' : ''}" type="button" data-action="trends-mode" data-mode="sprint">SPRINT</button>
-      <button class="btn ${mode === 'month' ? 'primary' : ''}" type="button" data-action="trends-mode" data-mode="month">MONTH</button>
-      <button class="btn ${mode === 'year' ? 'primary' : ''}" type="button" data-action="trends-mode" data-mode="year">YEAR</button>
-      <button class="btn ${mode === 'all' ? 'primary' : ''}" type="button" data-action="trends-mode" data-mode="all">ALL TIME</button>
+      <button class="btn ${mode === 'sprint' ? 'primary' : ''}" type="button" data-action="trends-mode" data-mode="sprint">SPRINT OVERVIEW</button>
+      <button class="btn ${mode === 'all' ? 'primary' : ''}" type="button" data-action="trends-mode" data-mode="all">ALL-TIME</button>
     </div>
-    <div class="card">
-      <div class="row between" style="flex-wrap:wrap;gap:8px;align-items:center">
-        <button class="btn" type="button" data-action="trends-prev" ${prevOk ? '' : 'disabled'} aria-label="Previous period">←</button>
-        <div class="col center" style="flex:1;min-width:0">
-          <div class="mono" style="font-size:15px;margin-top:4px;text-align:center">${escapeHtml(label)}</div>
-          <div class="muted" style="font-size:12px;margin-top:4px">${loaded ? (from && to ? `${from} → ${to}` : '—') : 'loading…'}</div>
-        </div>
-        <button class="btn" type="button" data-action="trends-next" ${nextOk ? '' : 'disabled'} aria-label="Next period">→</button>
-      </div>
-    </div>
-    ${metricsBlock}
-    ${chartsBlock}
+    ${body}
   `;
 }

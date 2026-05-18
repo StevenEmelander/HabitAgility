@@ -2,7 +2,7 @@ const { CF_SECRET } = require('./constants');
 const { jsonResponse, plainResponse, getBody, parseSprintIdParam } = require('./utils');
 const { handleGetSprint, handlePutSprint, handlePostSprint } = require('./sprints');
 const { handleGetEntry, handlePutEntry } = require('./entries');
-const { handleTrendSprintDetail, handleTrendMonth, handleTrendSprintSummary } = require('./summaries');
+const { handleTrendSprintDetail, handleTrendSprintSummary } = require('./summaries');
 
 // ── Router ───────────────────────────────────────────────────────────
 
@@ -11,8 +11,6 @@ function matchPath(path) {
   if (path === '/api/trend/sprint-summary') return { kind: 'trend-summary' };
   let m = path.match(/^\/api\/trend\/sprint\/([^/]+)$/);
   if (m) return { kind: 'trend-sprint', sprintIdRaw: decodeURIComponent(m[1]) };
-  m = path.match(/^\/api\/trend\/month\/(\d{4}-\d{2})$/);
-  if (m) return { kind: 'trend-month', yyyymm: m[1] };
   if (path === '/api/sprint') return { kind: 'sprint-create' };
   m = path.match(/^\/api\/sprint\/([^/]+)$/);
   if (m) return { kind: 'sprint-item', sprintIdRaw: decodeURIComponent(m[1]) };
@@ -48,7 +46,6 @@ exports.handler = async (event) => {
       if (sid == null) return plainResponse(400, 'Invalid sprintId');
       return await handleTrendSprintDetail(sid);
     }
-    if (route.kind === 'trend-month' && method === 'GET') return await handleTrendMonth(route.yyyymm);
     if (route.kind === 'trend-summary' && method === 'GET') return await handleTrendSprintSummary();
     return plainResponse(405, 'Method Not Allowed');
   } catch (err) {

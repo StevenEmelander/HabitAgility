@@ -10,32 +10,37 @@ A self-contained **single-file** web app (`app/tracker.html`) plus a small **AWS
 
 1. **Single-file HTML only** (`app/tracker.html`). Inline CSS/JS. No external CSS, frameworks, or CDN dependencies for the app shell.
 
-2. **Cloud is the source of truth.** No `localStorage` for tracker payload. The API is per-item REST under `/api/*`, gated by the CloudFront `X-CF-Secret` header (the lambda rejects anything missing it).
+2. **Cloud is the source of truth.** No `localStorage` for tracker payload. The API is strict per-item REST under `/api/*`, gated by the CloudFront `X-CF-Secret` header (the lambda rejects anything missing it). **No bulk endpoints, ever.** No Scans, ever.
 
-   **Routes:**
-   - `GET /api/cycles` → `{ cycles: [...], entryBounds: { min, max } }` — one DDB `GetItem` on the cycles row.
-   - `GET /api/cycles/:cycleId` → one cycle object or 404.
-   - `PUT /api/cycles/:cycleId` body `{ startDate, endDate, lengthDays, categories, habitDefinitions }` → `{ ok, removedHabitIds }`. Server reads the cycles row, replaces the named cycle, writes it back, then sweeps any habit ids no cycle defines anymore from every entry row. The returned `removedHabitIds` lets the front-end mirror that sweep locally without a second fetch.
-   - `DELETE /api/cycles/:cycleId` → same shape; sweeps orphans.
-   - `GET /api/entries` → `{ entries: { dateKey: habitValuesById } }` — one paginated `Query pk='DAY'` (no SK condition; partition-targeted, never a Scan).
-   - `GET /api/entries/:dateKey` → one entry or 404.
-   - `PUT /api/entries/:dateKey` body `{ habitValuesById }` → `{ ok }`. If `habitValuesById` is empty, the row is deleted instead. Bounds (`entryDateMin`/`entryDateMax` on the cycles row) are bumped via conditional `UpdateItem` only when the new date extends them.
-   - `DELETE /api/entries/:dateKey` → `{ ok }`. Recomputes bounds via two `Query Limit:1` reads (asc/desc) only when the deleted date was a current bound.
+   **Routes (current — see `infrastructure/lambdas/sync/index.js`):**
+   - `GET /api/sprint/:id` → one sprint object or 404.
+   - `POST /api/sprint` body `{ startDate, endDate, lengthDays, pointStep?, goalPoints, name, description, retrospective, categories, habitDefinitions }` → newly assigned integer id. Server allocates the id atomically via `nextSprintId` on the meta row.
+   - `PUT /api/sprint/:id` body same shape as POST → `{ ok, removedHabitIds }`. Server replaces the row, sweeps orphan habit ids from entries (bounded to sprint date ranges), re-stamps `sprintId` on entries when the date range moves, and invalidates the affected sprint summaries. Rejects `retrospective` edits on upcoming sprints (`startDate > today`) with 400.
+   - `GET /api/entry/:dateKey` → `{ dateKey, habitValuesById, sprintId }` or 404. One DDB `GetItem`.
+   - `PUT /api/entry/:dateKey` body `{ habitValuesById }` → `{ ok }`. Server looks up the covering sprint, stamps `sprintId`, bumps entry-date bounds on the meta row via one read-modify-write `UpdateItem`. Empty `habitValuesById` deletes the row server-side.
+   - `GET /api/trend/sprint/:id` → daily-bucket trend for one sprint: `{ from, to, buckets: [{key, pts, goal, days}, ...] }`.
+   - `GET /api/trend/sprint-summary` → `{ summaries: [{sprintId, startDate, endDate, pts, days, goalPoints, goalTotal, name}, ...] }`. Lazy-filled into DDB, invalidated on entry/sprint writes (including name edits).
 
-   **Boot** is two parallel calls — `GET /api/cycles` + `GET /api/entries`. No date-range parameters anywhere. **Edits** debounce per item: `pushCycle(id)` and `pushEntry(date)` each at 1500ms, keyed by id/date so concurrent edits to different items don't collide.
+   **Boot** loads exactly two rows: `GET /api/entry/:today` + `GET /api/sprint/:id` (id from the entry's `sprintId`). Day navigation loads one entry at a time. Trends Sprint Overview fetches one sprint's daily detail; All-Time fetches one summary collection. **Edits** debounce per item: `pushSprint(id)` and `pushEntry(date)` each at 1500ms, keyed by id/date so concurrent edits to different items don't collide. Text edits (name/description/retrospective) flow through a dedicated `input` event listener that updates state and debounces save **without re-rendering** — required to preserve focus + cursor position in textareas.
 
-   **DynamoDB tables:**
-   - `good-habit-tracker-cycles` — one row, `id="main"`, attrs `cyclesJson`, `entryDateMin`, `entryDateMax`, `updatedAt`. (The physical table name keeps `cycles` in it; the row holds both the cycle definitions and the entry-date bounds.)
-   - `good-habit-tracker-day-checkins` — `pk='DAY'`, `dateKey` SK, attr `valuesJson`. The physical table name keeps `day-checkins` in it for historical reasons; the lambda code refers to it as the entries table.
+   **DynamoDB partitions (single table, single physical table name retained for history):**
+   - `pk='main#DAY'`, `dateKey` SK — entry rows. Attrs: `valuesJson`, `sprintId`, `updatedAt`.
+   - `pk='main#SPRINT_DEF'`, `dateKey=String(sprintId)` SK — sprint definition rows. Attrs: `startDate`, `endDate`, `lengthDays`, `pointStep?`, `goalPoints`, `name?`, `description?`, `retrospective?`, `bodyJson` (categories + habitDefinitions), `updatedAt`. Optional string attrs are omitted from the row when empty (mirror the `pointStep` pattern).
+   - `pk='main#SPRINT_SUM'`, `dateKey=String(sprintId)` SK — sprint summary rows. Attrs: `startDate`, `endDate`, `pts`, `days`, `goalPoints`, `goalTotal`, `name?`, `updatedAt`.
+   - Meta row (separate physical table): `nextSprintId`, `entryDateMin`, `entryDateMax`. Single row, partition `id='main'`.
 
    **Schema:**
 
-   - per-entry `habitValuesById` — `{ habitId: boolean | number }`. A habit id with no defining cycle is stripped from every entry by the server sweep on the next cycle PUT/DELETE.
-   - per-cycle `{ id, startDate, endDate, lengthDays, pointStep?, categories[], habitDefinitions[] }`. `pointStep` is one of `0.1 | 0.25 | 0.5 | 1` (default `1` if missing) and controls the +/- increment for `points` and `pointsPerUnit` in the Plan tab; `maxUnits` is always integer. The upcoming cycle inherits `pointStep` from the current cycle when auto-created. Habits are boolean or count with `scoring` / point rules. Cloned cycles keep the same habit id until the last copy is removed.
+   - per-entry `habitValuesById` — `{ habitId: boolean | number }`. A habit id with no defining sprint is stripped from every entry by the server sweep on the next sprint PUT.
+   - per-sprint `{ id, startDate, endDate, lengthDays, pointStep?, goalPoints, name, description, retrospective, categories[], habitDefinitions[] }`. `pointStep` is one of `0.1 | 0.25 | 0.5 | 1` (default `1`) and controls Plan-tab steppers; `dailyLimit = 0` means an unlimited count habit. `name` ≤ 80, `description` ≤ 2000, `retrospective` ≤ 5000 chars (lambda clamps server-side as defense in depth). `pointStep` and `goalPoints` inherit from the previous sprint when auto-creating; `name`/`description`/`retrospective` do NOT inherit — each sprint starts blank.
 
-   **Plan-edit nudge:** past day 1 of the current cycle, opening the Plan tab auto-selects the **Next** mode so the user is steered toward editing the upcoming cycle. They can still toggle back to **Current** — when they do, a warning banner reminds them that editing the current cycle's rules can change scores already tallied today. No hard lock; just a default + warning.
+   **Plan-edit nudge:** past day 1 of the current sprint, opening the Plan tab auto-selects the **Next** mode so the user is steered toward editing the upcoming sprint. They can still toggle back to **Current** — when they do, a warning banner reminds them that editing the current sprint's rules can change scores already tallied today.
 
-3. **Privacy / telemetry.** No analytics, no third-party fonts or icons, no extra “phone home” beyond your own origin and `/api/cycles` + `/api/entries`.
+   **Trends tab (v0.6+):** two modes only.
+   - **Sprint Overview** (default) — prev/next walks every sprint. Shows name, description, daily-points chart with goal reference line, summary stats, and editable retrospective textarea. Retrospective is locked on upcoming sprints (`startDate > today`) both client- and server-side.
+   - **All-Time** — single chart, one point per sprint at avg pts/day across the user's whole history. Per-sprint legend labels by `name || "Sprint N"`.
+
+3. **Privacy / telemetry.** No analytics, no third-party fonts or icons, no extra "phone home" beyond your own origin and `/api/*`.
 
 4. **Deploy secrets.** `unlock_token` is passed only at deploy/synth (`--context unlock_token=...`). Never commit it. Stack outputs must **not** embed the raw token (use deploy scripts to print `https://…/?unlock=…` locally).
 
@@ -43,22 +48,25 @@ A self-contained **single-file** web app (`app/tracker.html`) plus a small **AWS
 
 ### App (`app/tracker.html`)
 
-Vanilla JS. Rebuilds DOM from `state` on change; `data-action` delegation on `document.body`.
+Vanilla JS. Rebuilds DOM from `state` on change; `data-action` delegation on `document.body` for clicks, plus a parallel `input` delegate for text fields (preserves focus across edits).
 
 Source files under `app/scripts/`:
-- `core.js` — state, helpers (`render`, `getCurrentCycle`, `getUpcomingCycle`, `cycleInfo`, `entryFor`, `pushCycle`, `pushEntry`, `applyOrphanSweepLocally`, `normalizeFirstCycleStartFromEntries`, `hasAnyEntries`).
-- `entry-ui.js` — `renderEntry` (the per-day entry tab).
-- `trends-ui.js` — `renderTrends`.
-- `plan-ui.js` — `renderPlan`, `renderAddHabitModal` (the cycle-editor tab).
-- `sync.js` — `bootSync`, debounced per-item `pushCycle`/`pushEntry`.
-- `handlers.js` — single `data-action` click delegate.
+- `constants.js` — debounces, defaults, length caps, API base paths.
+- `scoring.js` — pure habit-points math + `canEditRetrospective`, `clampSprintText`. Mirrors the lambda's `pointsForEntry` (parity-tested).
+- `types.js` — JSDoc `@typedef`s for Sprint, Entry, Habit, Category, SprintSummary, DayBucket.
+- `core.js` — state, render orchestration, `getCurrentSprint`, `getSprintById`, `sprintInfo`, `pushSprint`, `pushEntry`, `applyOrphanSweepLocally`, `hasAnyEntries`. Re-exports constants + scoring helpers.
+- `entry-ui.js` — `renderEntry` (per-day entry tab; shows sprint name above date when set).
+- `trends-ui.js` — `renderTrends`, `renderSprintOverview`, `renderAllTime`.
+- `plan-ui.js` — `renderPlan`, `renderAddHabitModal` (sprint-editor tab).
+- `sync.js` — `bootSync`, debounced per-item `pushSprint`/`pushEntry`, lazy loaders.
+- `handlers.js` — click + input delegates; action maps grouped by tab.
 
 ### Infrastructure (`infrastructure/`)
 
 | Piece | Region | Role |
 |--------|--------|------|
 | `CertStack` | us-east-1 | ACM cert, Lambda@Edge auth (viewer request) |
-| `GoodHabitTrackerStack` | us-west-2 | S3 site, CloudFront, Route53 record, sync Lambda + URL, DynamoDB (`good-habit-tracker-cycles`, `good-habit-tracker-day-checkins`) |
+| `GoodHabitTrackerStack` | us-west-2 | S3 site, CloudFront, Route53 record, sync Lambda + URL, DynamoDB (`good-habit-tracker-cycles` meta + `good-habit-tracker-day-checkins` rows — physical table names retained from earlier versions) |
 
 Edge auth checks `htok` cookie (value = SHA-256 hex of deploy token) or `?unlock=` token (same hash). Sync Lambda requires `X-CF-Secret` header from CloudFront (derived from deploy token in stack code).
 
@@ -78,7 +86,7 @@ Or `deploy.ps1` on Windows. Scripts echo the bookmarkable unlock URL; they do no
 
 **Legacy DynamoDB:** Older stacks used `good-habit-tracker-state` (and possibly `habit-tracker-state`). After migrating to `good-habit-tracker-cycles` + `good-habit-tracker-day-checkins`, remove any **retained** old tables in **us-west-2** from the AWS console if CloudFormation left them behind.
 
-**Backups:** `scripts/backup.ps1` (or `backup.sh`) reads `UNLOCK_TOKEN` from env, computes the `htok` cookie hash, calls `GET /api/cycles` + `GET /api/entries`, and writes a single timestamped JSON file to `backups/`. Run before any risky deploy or schema change.
+**Backups:** `scripts/backup.ps1` (or `backup.sh`) reads `UNLOCK_TOKEN` from env, computes the `htok` cookie hash, dumps every sprint + entry via the per-item REST API, and writes a single timestamped JSON file to `backups/`. Run before any risky deploy or schema change.
 
 ### Lambda@Edge auth updates (export deadlock)
 

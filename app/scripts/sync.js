@@ -70,6 +70,9 @@ async function flushSprint(sprintId) {
         lengthDays: sprint.lengthDays,
         pointStep: sprint.pointStep,
         goalPoints: sprint.goalPoints,
+        name: sprint.name || '',
+        description: sprint.description || '',
+        retrospective: sprint.retrospective || '',
         categories: sprint.categories || [],
         habitDefinitions: sprint.habitDefinitions || [],
       }),
@@ -195,6 +198,10 @@ export async function createSprint(template) {
       lengthDays: template.lengthDays,
       pointStep: template.pointStep,
       goalPoints: template.goalPoints,
+      // Metadata does NOT inherit — each sprint starts blank.
+      name: template.name || '',
+      description: template.description || '',
+      retrospective: template.retrospective || '',
       categories: template.categories || [],
       habitDefinitions: template.habitDefinitions || [],
     }),
@@ -270,6 +277,10 @@ async function ensureCurrentSprint() {
     lengthDays: length,
     pointStep,
     goalPoints,
+    // Metadata does not inherit — each sprint starts blank.
+    name: '',
+    description: '',
+    retrospective: '',
     categories,
     habitDefinitions: habits,
   });

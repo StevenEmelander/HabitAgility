@@ -15,7 +15,9 @@ import {
 import { renderEntry } from './entry-ui.js';
 import { renderAddHabitModal, renderPlan } from './plan-ui.js';
 import {
+  canEditRetrospective,
   categoryPoints,
+  clampSprintText,
   decimalsForStep,
   fmtPoints,
   fmtPointsForStep,
@@ -47,6 +49,8 @@ export {
   habitEarned,
   categoryPoints,
   totalPoints,
+  canEditRetrospective,
+  clampSprintText,
 };
 
 // ── App state ─────────────────────────────────────────────────────────
@@ -78,9 +82,6 @@ export const state = {
   trendsStep: 0,
   /** When stepping through sprints in the trends view, this holds the focused sprintId. */
   trendsSprintId: null,
-  /** Year (number) for year-mode and yyyy-mm string for month-mode. */
-  trendsYear: null,
-  trendsMonth: null,
   addHabitDraft: null,
 
   /** Per-item dirty tracking */
@@ -306,8 +307,6 @@ export function load() {
   state.trendsMode = 'sprint';
   state.trendsStep = 0;
   state.trendsSprintId = null;
-  state.trendsYear = null;
-  state.trendsMonth = null;
   state.addHabitDraft = null;
 }
 

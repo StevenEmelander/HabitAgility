@@ -40,12 +40,15 @@
 
 /**
  * @typedef Sprint
- * @property {number}     id           Positive integer; assigned by server on creation.
- * @property {string}     startDate    YYYY-MM-DD.
- * @property {string}     endDate      YYYY-MM-DD.
+ * @property {number}     id            Positive integer; assigned by server on creation.
+ * @property {string}     startDate     YYYY-MM-DD.
+ * @property {string}     endDate       YYYY-MM-DD.
  * @property {number}     lengthDays
- * @property {number}     [pointStep]  One of 0.1 / 0.25 / 0.5 / 1; default 1.
- * @property {number}     goalPoints   Daily goal points; default 10 if missing.
+ * @property {number}     [pointStep]   One of 0.1 / 0.25 / 0.5 / 1; default 1.
+ * @property {number}     goalPoints    Daily goal points; default 10 if missing.
+ * @property {string}     name          Optional sprint title; '' when unset.
+ * @property {string}     description   Optional intent set during planning; '' when unset.
+ * @property {string}     retrospective Optional reflection written during/after the sprint; '' when unset.
  * @property {Category[]} categories
  * @property {Habit[]}    habitDefinitions
  */
@@ -66,6 +69,7 @@
  * @property {number} days       Number of days in [startDate, min(endDate,today)] inclusive.
  * @property {number} goalPoints Daily goal at the time of computation.
  * @property {number} goalTotal  goalPoints × days.
+ * @property {string} name       Sprint name at time of computation; '' if unset.
  */
 
 /**

@@ -80,3 +80,29 @@ export function categoryPoints(entry, sprint, cid) {
 export function totalPoints(entry, sprint) {
   return sprint ? (sprint.categories || []).reduce((s, c) => s + categoryPoints(entry, sprint, c.id), 0) : 0;
 }
+
+// ── Sprint metadata helpers ───────────────────────────────────────────
+
+/**
+ * Whether the retrospective field is editable for a given sprint.
+ * Editable on past and current sprints; locked on upcoming sprints
+ * (those that haven't started yet).
+ * @param {Sprint|null} sprint
+ * @param {string} todayKey  YYYY-MM-DD
+ */
+export function canEditRetrospective(sprint, todayKey) {
+  return Boolean(sprint?.startDate && sprint.startDate <= todayKey);
+}
+
+/**
+ * Coerce to string, trim leading/trailing whitespace, slice to max length.
+ * Used to clamp user-entered sprint metadata before pushing to state.
+ * Mirror of the lambda's `clampText` in utils.js.
+ * @param {*} value
+ * @param {number} max
+ */
+export function clampSprintText(value, max) {
+  if (value == null) return '';
+  const s = String(value).trim();
+  return s.length > max ? s.slice(0, max) : s;
+}
