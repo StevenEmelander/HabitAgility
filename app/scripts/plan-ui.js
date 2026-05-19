@@ -21,10 +21,6 @@ function planCatAccent(cat) {
   return /^#[0-9a-fA-F]{3,8}$/.test(a) ? a : '#d4a574';
 }
 
-function habitKindLabel(kind) {
-  return kind === 'count' ? 'COUNT' : 'YES/NO';
-}
-
 export function renderAddHabitModal() {
   const d = state.addHabitDraft;
   if (!d) return '';
@@ -43,6 +39,45 @@ export function renderAddHabitModal() {
       <div class="plan-modal-alert-actions">
         <button type="button" class="btn" data-action="habit-add-cancel">Cancel</button>
         <button type="button" class="btn primary" data-action="habit-add-ok">OK</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/**
+ * Action-menu modal — vertical list of buttons for the ⋯ menu on habits and
+ * categories. Replaces the inline [✎] / [KIND] / [✕] triplet on each habit
+ * (and the [Name] / [Remove] pair on each category), which together ate
+ * ~132 px of horizontal real estate per row.
+ *
+ * Shape of state.actionMenu:
+ *   {
+ *     title: string,
+ *     items: [
+ *       { label, action, payload?, kind?: 'normal' | 'danger' },
+ *       ...
+ *     ],
+ *   }
+ *
+ * Each item dispatches its `action` with `payload` (so the existing
+ * rename-habit / remove-habit / switch-kind / rename-category / remove-category
+ * handlers can stay unchanged — the menu just forwards to them).
+ */
+export function renderActionMenuModal() {
+  const m = state.actionMenu;
+  if (!m) return '';
+  const buttons = (m.items || [])
+    .map(
+      (it, i) =>
+        `<button type="button" class="plan-menu-item ${it.kind === 'danger' ? 'plan-menu-item-danger' : ''}" data-action="action-menu-pick" data-idx="${i}">${escapeHtml(it.label)}</button>`,
+    )
+    .join('');
+  return `<div class="plan-modal-backdrop" data-action="action-menu-backdrop" role="presentation">
+    <div class="plan-modal-alert plan-modal-menu" role="dialog" aria-modal="true" aria-labelledby="action-menu-title">
+      <div id="action-menu-title" class="plan-modal-menu-title">${escapeHtml(m.title || '')}</div>
+      <div class="plan-menu-items">${buttons}</div>
+      <div class="plan-modal-alert-actions">
+        <button type="button" class="btn" data-action="action-menu-cancel">Cancel</button>
       </div>
     </div>
   </div>`;
@@ -90,7 +125,6 @@ export function renderPlan() {
   const sprintHead = hasEntries && state.planMode === 'next' ? 'Upcoming sprint' : 'Current sprint';
   if (!s) {
     return `<div class="plan-root">
-      <div class="plan-h">Plan</div>
       ${
         hasEntries
           ? `<div class="plan-seg">
@@ -104,19 +138,18 @@ export function renderPlan() {
   }
   // Past day 1, editing the current sprint's rules can change today's already-scored
   // values. Warn the user; suggest editing Next instead.
+  // Condensed single-line banners. The previous 3-line prose versions ate
+  // ~80 px each on a sprint that was probably 2/3 in this state — the user
+  // gets the gist after one read; verbose explainers belong in docs.
   const showCurrentWarning = state.planMode === 'current' && hasEntries && !isCurrentSprintFirstDay();
   const warning = showCurrentWarning
-    ? `<div class="card plan-warning"><strong>Heads up:</strong> editing the current sprint past day 1 can change scores you've already tallied. Consider switching to <strong>Next</strong> to plan the upcoming sprint without affecting history.</div>`
+    ? `<div class="card plan-warning">⚠ Editing past day 1 may change today's tallied score. Use <strong>Next</strong> instead.</div>`
     : '';
-  // Planning hint — surfaces what the disabled start-date input means on iOS
-  // (no hover → tooltip is invisible). Mirrors the "Sprint hasn't started yet"
-  // message shown on the Burndown tab.
   const planningHint = isSprintInPlanning(s)
-    ? `<div class="card plan-hint"><strong>Planning:</strong> this sprint hasn't started yet. The start date will be set automatically when you make your first entry on the <strong>Entries</strong> tab. Until then, adjust the end date to change the duration.</div>`
+    ? `<div class="card plan-hint">📋 Planning — start date locks on your first entry.</div>`
     : '';
   const goal = goalForSprint(s);
   return `<div class="plan-root">
-    <div class="plan-h">Plan</div>
     ${
       hasEntries
         ? `<div class="plan-seg">
@@ -152,7 +185,6 @@ export function renderPlan() {
       <div class="plan-section">
         <div class="plan-section-label">SCHEDULE</div>
         ${renderSprintDates(s)}
-        <div class="mono muted plan-length-line">${s.lengthDays} day${s.lengthDays === 1 ? '' : 's'}${isSprintInPlanning(s) ? ' · planning' : ''}</div>
       </div>
       <div class="plan-section">
         <div class="plan-section-label">SCORING</div>
@@ -166,19 +198,15 @@ export function renderPlan() {
         ${renderPointStepSelector(step)}
       </div>
     </div>
-    <div class="card plan-cat-toolbar">
-      <div class="plan-cat-toolbar-inner">
-        <span class="plan-cat-toolbar-lbl">Categories</span>
-        <button type="button" class="btn primary" data-action="add-category">+ Category</button>
-      </div>
-    </div>
     ${
       categories.length === 0
         ? `<div class="card plan-empty">
             <div class="plan-empty-title">No categories yet</div>
-            <div class="plan-empty-body">Tap <strong>+ Category</strong> above to group your habits. Common starting points: <em>Health</em>, <em>Focus</em>, <em>Recovery</em>.</div>
+            <div class="plan-empty-body">Group your habits by area — try <em>Health</em>, <em>Focus</em>, or <em>Recovery</em>.</div>
+            <button type="button" class="btn primary plan-empty-cta" data-action="add-category">+ Category</button>
           </div>`
-        : categories.map((cat) => renderPlanCategory(s, cat, step)).join('')
+        : `${categories.map((cat) => renderPlanCategory(s, cat, step)).join('')}
+           <button type="button" class="btn plan-add-cat" data-action="add-category">+ Category</button>`
     }
   </div>`;
 }
@@ -243,56 +271,54 @@ function renderPointStepSelector(currentStep) {
 function renderPlanCategory(sprint, cat, step) {
   const habits = (sprint.habitDefinitions || []).filter((h) => h.categoryId === cat.id);
   const cid = escapeHtml(cat.id);
+  const count = habits.length;
   return `<div class="card plan-cat" style="--cat-accent:${planCatAccent(cat)}">
     <div class="plan-cat-head">
-      <div class="plan-cat-title">${escapeHtml(cat.label)}</div>
-      <div class="plan-btns">
-        <button type="button" class="btn" data-action="rename-category" data-id="${cid}" aria-label="Rename category">Name</button>
+      <div class="plan-cat-title">${escapeHtml(cat.label)}${count > 0 ? ` <span class="plan-cat-count">${count}</span>` : ''}</div>
+      <div class="plan-cat-actions">
         <button type="button" class="btn" data-action="add-habit" data-id="${cid}" aria-label="Add habit">+ Habit</button>
-        <button type="button" class="btn danger" data-action="remove-category" data-id="${cid}" aria-label="Delete category">Remove</button>
+        <button type="button" class="btn plan-menu-btn" data-action="cat-menu" data-id="${cid}" aria-label="Category actions">⋯</button>
       </div>
     </div>
     <div class="col plan-cat-habits">${habits.map((h) => renderPlanHabit(h, step)).join('')}</div>
   </div>`;
 }
 
+/**
+ * Compact one-row habit layout:
+ *   [Name........................]  [stepper]  [⋯]
+ *
+ * For count habits a second tiny row hangs the limit stepper below — keeps
+ * both controls visible without ballooning the card to three rows like before.
+ * The ⋯ menu opens an action sheet with Rename, Switch kind, and Delete
+ * (replaces the inline [✎] [KIND] [✕] triplet that took ~132 px of width per
+ * habit). Drops the "Points:" / "Limit:" labels since the stepper context is
+ * obvious and the chrome was redundant.
+ */
 function renderPlanHabit(h, step) {
   const hid = escapeHtml(h.id);
   const ptsOn = h.scoring.points || 0;
   const ppu = h.scoring.pointsPerUnit || 0;
   const limit = Number(h.scoring.dailyLimit) || 0;
-  const stepper = (field, delta, display) => `<div class="row plan-stepper">
-    <button type="button" class="btn" data-action="score-edit" data-id="${hid}" data-field="${field}" data-delta="${-delta}" aria-label="Decrease ${field}">−</button>
+  const stepper = (field, delta, display, ariaName) => `<div class="row plan-stepper">
+    <button type="button" class="btn plan-stepper-btn" data-action="score-edit" data-id="${hid}" data-field="${field}" data-delta="${-delta}" aria-label="Decrease ${ariaName}">−</button>
     <div class="mono plan-stepper-val">${display}</div>
-    <button type="button" class="btn" data-action="score-edit" data-id="${hid}" data-field="${field}" data-delta="${delta}" aria-label="Increase ${field}">+</button>
+    <button type="button" class="btn plan-stepper-btn" data-action="score-edit" data-id="${hid}" data-field="${field}" data-delta="${delta}" aria-label="Increase ${ariaName}">+</button>
   </div>`;
-  const scoreBtns =
+  const mainStepper =
     h.kind === 'boolean'
-      ? `<div class="plan-scores">
-        <div class="plan-score-group">
-          <div class="plan-lbl">Points:</div>
-          ${stepper('points', step, fmtPointsForStep(ptsOn, step))}
-        </div>
-      </div>`
-      : `<div class="plan-scores">
-        <div class="plan-score-group">
-          <div class="plan-lbl">Points:</div>
-          ${stepper('pointsPerUnit', step, fmtPointsForStep(ppu, step))}
-        </div>
-        <div class="plan-score-group plan-score-group-limit">
-          <div class="plan-lbl">Limit:</div>
-          ${stepper('dailyLimit', 1, limit > 0 ? String(limit) : '∞')}
-        </div>
-      </div>`;
+      ? stepper('points', step, `+${fmtPointsForStep(ptsOn, step)}`, 'points')
+      : stepper('pointsPerUnit', step, `+${fmtPointsForStep(ppu, step)}/u`, 'points per unit');
+  const limitRow =
+    h.kind === 'count'
+      ? `<div class="plan-habit-limit">${stepper('dailyLimit', 1, limit > 0 ? `≤${limit}` : '∞', 'daily limit')}</div>`
+      : '';
   return `<div class="card2 plan-habit">
-    <div class="plan-habit-top">
+    <div class="plan-habit-row">
       <div class="plan-habit-name">${escapeHtml(h.label)}</div>
-      <div class="plan-btns plan-btns-single">
-        <button type="button" class="btn" data-action="rename-habit" data-id="${hid}" aria-label="Rename habit">✎</button>
-        <button type="button" class="btn plan-kind" data-action="switch-kind" data-id="${hid}" title="Switch type" aria-label="Switch habit type">${habitKindLabel(h.kind)}</button>
-        <button type="button" class="btn danger" data-action="remove-habit" data-id="${hid}" aria-label="Delete habit">✕</button>
-      </div>
+      ${mainStepper}
+      <button type="button" class="btn plan-menu-btn" data-action="habit-menu" data-id="${hid}" aria-label="Habit actions">⋯</button>
     </div>
-    ${scoreBtns}
+    ${limitRow}
   </div>`;
 }

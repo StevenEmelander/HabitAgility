@@ -135,33 +135,72 @@ body {
 .plan-root .card2 { padding: 8px 10px; }
 .plan-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 6px; }
 .plan-seg .btn { width: 100%; justify-content: center; }
-.plan-h { font-size: 10px; letter-spacing: 0.09em; color: var(--muted); margin: 0 0 6px; text-transform: uppercase; }
-.plan-cat-toolbar { padding: 12px 14px; }
-.plan-cat-toolbar-inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
-.plan-cat-toolbar-lbl { font-size: 10px; letter-spacing: 0.09em; color: var(--muted); text-transform: uppercase; }
+/* Category card — accent stripe on the left, header row with title + count
+   badge + actions (+ Habit and the ⋯ menu). Inline Name/Remove buttons were
+   replaced by the menu in v0.10.2; ~88 px of header chrome saved per
+   category. */
 .plan-cat { --cat-accent:#d4a574; position: relative; padding-left: 12px; overflow: hidden; }
 .plan-cat::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--cat-accent); border-radius: 2px 0 0 2px; }
-.plan-cat-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; }
-.plan-cat-title { font-size: 14px; font-weight: 600; letter-spacing: 0.04em; color: var(--cat-accent); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.plan-cat-head { display: flex; flex-wrap: nowrap; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; }
+.plan-cat-title { font-size: 14px; font-weight: 600; letter-spacing: 0.04em; color: var(--cat-accent); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.plan-cat-count {
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 999px;
+  padding: 1px 7px;
+  margin-left: 4px;
+}
+.plan-cat-actions { display: flex; gap: 4px; flex-shrink: 0; }
 .plan-cat-habits { gap: 4px; }
-.plan-btns { display: flex; flex-wrap: wrap; gap: 5px; justify-content: flex-end; }
-.plan-btns-single { flex-wrap: nowrap; }
+.plan-add-cat { display: block; width: 100%; margin: 4px 0 12px; justify-content: center; color: var(--muted); }
+
+/* Habit card — single compact row of [name] [main stepper] [⋯ menu]. Count
+   habits hang a small "≤ limit" stepper on a second line; boolean habits stay
+   one row. Drops the inline ✎/KIND/✕ triplet (saved ~132 px wide) and the
+   per-row "Points:" / "Limit:" labels (steppers carry the unit in the value
+   readout: "+1", "+0.5/u", "≤4"). */
 .plan-habit { margin-top: 0; padding-top: 0; border-top: none; }
 .plan-habit + .plan-habit { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
-.plan-habit-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; align-items: center; }
-.plan-habit-name { font-size: 13px; line-height: 1.3; min-width: 0; flex: 1; }
-.plan-habit-top { flex-wrap: nowrap; align-items: center; }
-.plan-kind { font-size: 10px; letter-spacing: 0.06em; padding: 3px 8px; border-radius: 7px; border: 1px solid var(--border); background: #12121a; color: var(--muted); }
-.plan-scores { display: flex; flex-wrap: nowrap; align-items: center; gap: 12px; margin-top: 6px; overflow-x: auto; }
-.plan-scores > .row { gap: 5px; flex-wrap: wrap; }
-.plan-stepper { gap: 4px; flex-wrap: nowrap; align-items: center; }
-.plan-score-group { display: flex; align-items: center; gap: 4px; min-width: max-content; }
-.plan-score-group-limit { margin-left: auto; }
+.plan-habit-row { display: flex; align-items: center; gap: 8px; }
+.plan-habit-name { font-size: 14px; line-height: 1.3; min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plan-habit-limit { display: flex; justify-content: flex-end; margin-top: 4px; padding-right: 48px; }
+
+.plan-stepper { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.plan-stepper-btn { min-width: 36px; min-height: 36px; padding: 4px 8px; font-size: 16px; }
 .plan-stepper-val {
-  min-width: 3.2em;
+  min-width: 3.6em;
   text-align: center;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text);
+  padding: 0 4px;
+}
+
+/* The ⋯ menu trigger — small square, lower visual weight than the primary
+   actions in the same row. */
+.plan-menu-btn {
+  min-width: 36px;
+  min-height: 36px;
+  padding: 4px 6px;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+/* Small label still used by the date pickers (Start / End) and the SCORING
+   row (Goal:). */
+.plan-lbl {
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  text-transform: none;
+  margin: 0;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
 }
 .plan-lbl {
   font-size: 11px;
@@ -201,6 +240,36 @@ body {
 
 .plan-modal-alert-title { font-size: 15px; font-weight: 600; margin: 0 0 8px; color: var(--text); }
 .plan-modal-alert-hint { font-size: 12px; color: var(--muted); margin: 0 0 8px; line-height: 1.35; }
+
+/* Action-menu modal (the ⋯ sheet on habits + categories). The title is the
+   habit / category name; items are stacked vertically and tap to dispatch
+   one of the existing rename / delete / switch-kind handlers. */
+.plan-modal-menu { padding: 14px 16px 12px; }
+.plan-modal-menu-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 0 0 10px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.plan-menu-items { display: flex; flex-direction: column; gap: 6px; }
+.plan-menu-item {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  background: #111119;
+  color: var(--text);
+  border-radius: 10px;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+.plan-menu-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.plan-menu-item-danger { color: var(--danger); border-color: var(--danger); }
 .plan-input-inmodal { width: 100%; margin: 0 0 8px; padding: 10px 11px; border-radius: 6px; border: 1px solid var(--border); background: #0e0e12; color: var(--text); font-size: 16px; }
 .plan-modal-kind-row { display: flex; gap: 6px; margin-bottom: 4px; }
 .plan-modal-kind-row .btn { flex: 1; font-size: 13px; padding: 7px 8px; }
@@ -363,24 +432,29 @@ body {
 .plan-scoring-row-step { margin-top: 8px; gap: 5px; }
 .plan-scoring-unit { font-size: 11px; }
 
-/* Warning + planning hint cards: visually distinct via border color. */
+/* Warning + planning hint: single-line banner. The verbose 3-line prose
+   from earlier releases was redundant after the first read; this saves
+   ~50 px on the most common state (planning sprint). */
 .plan-warning {
   border-color: var(--danger);
   color: var(--danger);
   font-size: 13px;
-  line-height: 1.4;
+  line-height: 1.35;
+  padding: 8px 12px;
 }
 .plan-hint {
   border-color: var(--plan);
   color: var(--plan);
   font-size: 13px;
-  line-height: 1.45;
+  line-height: 1.35;
+  padding: 8px 12px;
 }
 
 /* Empty state when no categories exist on the focused sprint. */
 .plan-empty { padding: 16px; text-align: center; }
 .plan-empty-title { font-size: 14px; font-weight: 600; margin-bottom: 6px; color: var(--text); }
-.plan-empty-body { font-size: 13px; line-height: 1.5; color: var(--muted); }
+.plan-empty-body { font-size: 13px; line-height: 1.5; color: var(--muted); margin-bottom: 12px; }
+.plan-empty-cta { display: inline-block; }
 
 .plan-loading { font-size: 14px; line-height: 1.45; }
 

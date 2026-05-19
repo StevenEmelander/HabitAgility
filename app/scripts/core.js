@@ -13,7 +13,7 @@ import {
   TOAST_DISMISS_MS,
 } from './constants.js';
 import { renderEntry } from './entry-ui.js';
-import { renderAddHabitModal, renderPlan, renderTextModal } from './plan-ui.js';
+import { renderActionMenuModal, renderAddHabitModal, renderPlan, renderTextModal } from './plan-ui.js';
 import {
   canEditRetrospective,
   categoryPoints,
@@ -88,6 +88,9 @@ export const state = {
   /** Generic text-input modal (replaces window.prompt for add-category, rename-category, rename-habit).
    *  Shape: { kind, title, hint?, placeholder?, initialValue?, okLabel?, maxlength?, id? } | null */
   textModal: null,
+  /** Action-menu modal (the ⋯ menu on habits + categories).
+   *  Shape: { title, items: [{ label, action, payload?, kind? }, ...] } | null */
+  actionMenu: null,
 
   /** Per-item dirty tracking */
   _dirtySprintIds: {},
@@ -318,6 +321,7 @@ export function load() {
   state.trendsSprintId = null;
   state.addHabitDraft = null;
   state.textModal = null;
+  state.actionMenu = null;
 }
 
 export function render() {
@@ -366,6 +370,7 @@ export function render() {
       <button class="tab ${state.tab === 'plan' ? 'active' : ''}" role="tab" aria-selected="${state.tab === 'plan'}" data-action="tab" data-tab="plan">PLAN</button>
     </nav>
     ${state.addHabitDraft ? renderAddHabitModal() : ''}
-    ${state.textModal ? renderTextModal() : ''}`;
-  document.body.style.overflow = state.addHabitDraft || state.textModal ? 'hidden' : '';
+    ${state.textModal ? renderTextModal() : ''}
+    ${state.actionMenu ? renderActionMenuModal() : ''}`;
+  document.body.style.overflow = state.addHabitDraft || state.textModal || state.actionMenu ? 'hidden' : '';
 }

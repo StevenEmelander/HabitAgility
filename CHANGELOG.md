@@ -4,6 +4,44 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.10.2] - 2026-05-19
+
+Plan-tab compaction. The 0.10.1 "restructure" just added section labels; this
+release actually cuts visible chrome to make the tab usable on a phone without
+endless scrolling.
+
+### UX (Plan tab) — measured before/after on iPhone widths
+
+- **Habit row collapsed to one line.** Was `[name] [✎] [YES/NO] [✕]` + `Points: [−][1][+]` (~100 px tall per habit, ~132 px of trailing buttons). Now `[name] [stepper] [⋯]` on a single row — count habits add a small "≤N" stepper on a second line. Per-habit height ~52 px. **For a sprint with 9 habits, that's ~430 px of vertical space recovered.** Drops the "Points:" / "Limit:" labels (steppers carry the unit in the value: `+1`, `+0.5/u`, `≤4`).
+- **Category card header trimmed.** Was `[CATEGORY] [Name] [+ Habit] [Remove]` (~88 px header per category). Now `[CATEGORY] [count badge] [+ Habit] [⋯]` — Rename and Remove move into the `⋯` menu (rare actions, freed up width). The small count badge gives instant visibility into how many habits live there.
+- **Generic action-menu modal** replaces the inline per-row triplet of icon buttons. One vertical sheet handles both the habit `⋯` (Rename / Switch kind / Delete) and the category `⋯` (Rename / Delete). The menu items dispatch the existing handlers — no business-logic changes.
+- **Sprint card: dropped the duplicate "14 days · planning" line.** The dates already imply the count and the planning hint card already says "planning". Saves ~22 px.
+- **"+ Category" toolbar card removed.** Was a whole card just to hold a label and one button (~70 px). Now lives at the end of the category list as a subtle full-width button — present but unobtrusive when categories exist. In the empty state it's the CTA inside the empty-state card.
+- **"Plan" tiny caption at the top removed.** The bottom-tab label already says PLAN. ~22 px reclaimed.
+- **Single-line planning hint** ("📋 Planning — start date locks on your first entry.") and **single-line warning** ("⚠ Editing past day 1 may change today's tallied score. Use Next instead."). Verbose three-line prose belongs in docs, not in the user's daily viewport — ~40 px each.
+
+### Total vertical space recovered
+
+For a typical view (current sprint, 3 categories × 3 habits, planning state):
+
+| Item | Before | After | Saved |
+|---|---:|---:|---:|
+| "Plan" caption | 22 | 0 | 22 |
+| Planning hint | 80 | 36 | 44 |
+| Sprint length line | 22 | 0 | 22 |
+| `+ Category` toolbar | 70 | 0 | 70 |
+| 3 × category headers | 264 | 132 | 132 |
+| 9 × habit rows | 900 | 470 | 430 |
+| **Total** | **~1358** | **~638** | **~720 px** |
+
+A 14-inch desktop scroll became a phone-screen glance.
+
+### Code cleanup
+
+- Dropped now-dead CSS rules: `.plan-h`, `.plan-cat-toolbar*`, `.plan-btns*`, `.plan-habit-top`, `.plan-kind`, `.plan-scores`, `.plan-score-group*`, `.plan-goal-headline*` (had cleaned the markup but rule was lingering).
+- Dropped the `habitKindLabel()` function (no longer rendered anywhere — the kind toggle was inline; switch-kind now lives in the `⋯` menu).
+- `state.actionMenu` shape mirrors `state.textModal` for symmetry — both modals close on backdrop click + Cancel button + render in `core.js` `render()` alongside the existing add-habit modal.
+
 ## [0.10.1] - 2026-05-19
 
 Plan-tab re-evaluation + testing infrastructure. No infra changes — pure

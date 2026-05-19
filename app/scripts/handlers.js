@@ -187,6 +187,24 @@ function submitTextModal() {
   closeTextModal();
 }
 
+// ── Action-menu modal ────────────────────────────────────────────────
+// The ⋯ button on each habit and category opens a vertical sheet of
+// actions. Each item just forwards to an existing handler (rename-habit,
+// remove-habit, switch-kind, rename-category, remove-category) — no new
+// business logic; this is purely a presentation shift to free up
+// horizontal space in the habit/category rows.
+
+function openActionMenu(menu) {
+  state.actionMenu = menu;
+  render();
+}
+
+function closeActionMenu() {
+  state.actionMenu = null;
+  document.body.style.overflow = '';
+  render();
+}
+
 // ── Action handlers ───────────────────────────────────────────────────
 // Each handler receives a context object: { target, action, id, delta }.
 // `target` = the matched element with data-action; `id`/`delta` are pre-parsed.
@@ -229,6 +247,26 @@ const globalActions = {
   },
   'text-modal-ok': () => {
     submitTextModal();
+  },
+  'action-menu-backdrop': ({ event }) => {
+    if (event.target.closest('.plan-modal-alert')) return;
+    closeActionMenu();
+  },
+  'action-menu-cancel': () => {
+    closeActionMenu();
+  },
+  'action-menu-pick': ({ target }) => {
+    const m = state.actionMenu;
+    if (!m) return;
+    const idx = Number(target.dataset.idx);
+    const item = m.items?.[idx];
+    closeActionMenu();
+    if (!item) return;
+    // Forward to the existing handler — the menu is just a router. Build the
+    // ctx shape each handler expects (id is the common one).
+    const handler = findHandler(item.action);
+    if (!handler) return;
+    handler({ event: null, target, action: item.action, id: item.payload?.id });
   },
   'habit-add-kind': ({ target }) => {
     const d = state.addHabitDraft;
@@ -461,6 +499,34 @@ const planActions = {
     pushSprint(sprint.id);
     invalidateTrendsAll();
     render();
+  },
+  'habit-menu': ({ id }) => {
+    const sprint = getPlanModeSprint();
+    if (!sprint) return;
+    const h = sprint.habitDefinitions.find((x) => x.id === id);
+    if (!h) return;
+    const switchLabel = h.kind === 'count' ? 'Switch to Yes / No' : 'Switch to Count';
+    openActionMenu({
+      title: h.label,
+      items: [
+        { label: 'Rename', action: 'rename-habit', payload: { id } },
+        { label: switchLabel, action: 'switch-kind', payload: { id } },
+        { label: 'Delete', action: 'remove-habit', payload: { id }, kind: 'danger' },
+      ],
+    });
+  },
+  'cat-menu': ({ id }) => {
+    const sprint = getPlanModeSprint();
+    if (!sprint) return;
+    const c = sprint.categories.find((x) => x.id === id);
+    if (!c) return;
+    openActionMenu({
+      title: c.label,
+      items: [
+        { label: 'Rename', action: 'rename-category', payload: { id } },
+        { label: 'Delete', action: 'remove-category', payload: { id }, kind: 'danger' },
+      ],
+    });
   },
   'rename-habit': ({ id }) => {
     const sprint = getPlanModeSprint();
