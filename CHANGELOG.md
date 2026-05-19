@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.11.8] - 2026-05-19
+
+Fix logical-id casing in the ARecordLegacy override. The deployed logical id
+is `ARecordE7B57761` (camelCase, as CDK generates it), not `ARECORDE7B57761`
+— the AWS CLI's text rendering had upper-cased the key in my earlier dump.
+0.11.7 used the wrong casing so CFN still saw the legacy record as a brand-
+new create, hit the same DNS-name collision, and rolled back.
+
 ## [0.11.7] - 2026-05-19
 
 Pin the legacy `ght.vexom.io` A-record's CFN logical id to its deployed value
