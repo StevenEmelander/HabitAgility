@@ -263,7 +263,10 @@ async function ensureCurrentSprint() {
       template = await loadSprint(latest.sprintId);
     }
   } catch (_) {}
-  const length = template?.lengthDays || DEFAULT_SPRINT_LENGTH_DAYS;
+  // Sprint length defaults to DEFAULT_SPRINT_LENGTH_DAYS (14) for new sprints —
+  // it does NOT inherit from the previous sprint. pointStep and goalPoints do
+  // inherit, since those are scoring settings the user has tuned.
+  const length = DEFAULT_SPRINT_LENGTH_DAYS;
   const pointStep = template?.pointStep || DEFAULT_POINT_STEP;
   const goalPoints =
     template && Number.isFinite(Number(template.goalPoints))

@@ -9,7 +9,13 @@
  * the top of this file (date math, ensure-loaded plumbing, plan-mode sprint resolver).
  */
 
-import { API_TREND, SPRINT_DESC_MAX, SPRINT_NAME_MAX, SPRINT_RETRO_MAX } from './constants.js';
+import {
+  API_TREND,
+  DEFAULT_SPRINT_LENGTH_DAYS,
+  SPRINT_DESC_MAX,
+  SPRINT_NAME_MAX,
+  SPRINT_RETRO_MAX,
+} from './constants.js';
 import {
   POINT_STEPS,
   addDaysKey,
@@ -84,10 +90,14 @@ async function ensurePlanSprintLoaded() {
   const cur = getCurrentSprint();
   if (!cur) return;
   const nextStart = addDaysKey(cur.endDate, 1);
+  // New sprints default to DEFAULT_SPRINT_LENGTH_DAYS (14) regardless of the
+  // current sprint's length — user adjusts via the date pickers if they want
+  // something else. Length doesn't inherit, but pointStep and goalPoints do.
+  const nextLength = DEFAULT_SPRINT_LENGTH_DAYS;
   await createSprint({
     startDate: nextStart,
-    endDate: addDaysKey(nextStart, cur.lengthDays - 1),
-    lengthDays: cur.lengthDays,
+    endDate: addDaysKey(nextStart, nextLength - 1),
+    lengthDays: nextLength,
     pointStep: cur.pointStep,
     goalPoints: cur.goalPoints,
     // Metadata does not inherit — each sprint starts blank.
@@ -307,15 +317,6 @@ const planActions = {
     const step = typeof sprint.pointStep === 'number' && sprint.pointStep > 0 ? sprint.pointStep : 1;
     const cur = Number(sprint.goalPoints) || 0;
     sprint.goalPoints = quantize(Math.max(0, cur + delta * step));
-    pushSprint(sprint.id);
-    invalidateTrendsAll();
-    render();
-  },
-  'sprint-len': ({ delta }) => {
-    const sprint = getPlanModeSprint();
-    if (!sprint) return;
-    sprint.lengthDays = Math.max(1, sprint.lengthDays + delta);
-    sprint.endDate = addDaysKey(sprint.startDate, sprint.lengthDays - 1);
     pushSprint(sprint.id);
     invalidateTrendsAll();
     render();

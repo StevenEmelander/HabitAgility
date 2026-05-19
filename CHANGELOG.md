@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+### Removed
+
+- **`±14d` length stepper buttons on the Plan tab.** Redundant with the start/end date pickers — adjust via dates. Length still displays below the date row.
+
+### Changed
+
+- **New sprints always default to 14 days** regardless of the prior sprint's length. `pointStep` and `goalPoints` still inherit (they're scoring settings the user has tuned), but length doesn't — the date pickers are the right surface for adjusting a specific sprint's window. Affects both first-sprint creation (`ensureCurrentSprint`) and next-sprint creation (Plan tab → Next).
+- **iOS auto-zoom fix.** Sprint name/description inputs, date pickers, and the retrospective textarea bumped to `font-size: 16px`. Safari only auto-zooms on focus when the input font-size is below 16, so this disables the unwanted zoom without touching viewport `user-scalable` (which would block accessibility pinch-zoom).
+
 ## [0.7] - 2026-05-19
 
 ### Added

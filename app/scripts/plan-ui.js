@@ -130,12 +130,7 @@ export function renderPlan() {
             value="${s.endDate}" />
         </label>
       </div>
-      <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px">
-        <span class="plan-lbl">Length:</span>
-        <button type="button" class="btn" data-action="sprint-len" data-delta="-14">−14d</button>
-        <button type="button" class="btn" data-action="sprint-len" data-delta="14">+14d</button>
-        <span class="mono muted" style="font-size:11px">${s.lengthDays} days</span>
-      </div>
+      <div class="mono muted" style="font-size:11px;margin-top:6px">${s.lengthDays} day${s.lengthDays === 1 ? '' : 's'}</div>
       <div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap;align-items:center">
         <span class="plan-lbl">Goal:</span>
         <button type="button" class="btn" data-action="goal-step" data-delta="-1">−</button>
