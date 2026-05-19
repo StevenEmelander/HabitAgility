@@ -1,6 +1,8 @@
-# Good Habit Tracker
+# HabitAgility
 
-Mobile-first **habit tracker** (vanilla HTML/JS, no frameworks) with an **AWS CDK** stack: CloudFront, S3, Lambda@Edge (cookie / unlock-link gate), Lambda function URL, and DynamoDB. Cloud-only persistence — no `localStorage` for tracker data. Designed for personal hosting on an obscure subdomain.
+Mobile-first **Agile-style habit tracker** — Scrum vocabulary (sprints, burndown, retrospectives, velocity) applied to daily check-ins. Vanilla HTML/JS, no frameworks. Backed by an **AWS CDK** stack: CloudFront, S3, Lambda@Edge (cookie / unlock-link gate), Lambda function URL, and DynamoDB. Cloud-only persistence — no `localStorage` for tracker data. Designed for personal hosting on an obscure subdomain.
+
+> Repository, CDK construct IDs, DynamoDB table names, S3 bucket names, and Lambda function names still use the historical "good-habit-tracker" identifiers. **Renaming any of these is a CloudFormation replacement event** and isn't worth doing for a working stack — the user-facing brand and docs are HabitAgility; the infra plumbing kept its names for stability.
 
 **License:** [MIT](./LICENSE) · **Changelog:** [CHANGELOG.md](./CHANGELOG.md) · **Security:** [SECURITY.md](./SECURITY.md) · **Contributing:** [CONTRIBUTING.md](./CONTRIBUTING.md)
 

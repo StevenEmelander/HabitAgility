@@ -1,10 +1,16 @@
-# Good Habit Tracker — maintainer notes
+# HabitAgility — maintainer notes
 
 Reference for humans and coding agents working in this repository.
 
 ## What this is
 
-A self-contained **single-file** web app (`app/tracker.html`) plus a small **AWS CDK** stack. Intended for **personal** hosting: obscure hostname, Lambda@Edge cookie gate, optional unlock query parameter for new devices.
+A self-contained **single-file** web app (`app/tracker.html`) plus a small **AWS CDK** stack. Intended for **personal** hosting: obscure hostname, Lambda@Edge cookie gate, optional unlock query parameter for new devices. Branded **HabitAgility** from v0.10.4 onward — Agile vocabulary (sprints, burndown, retrospectives, velocity) applied to a personal habit tracker.
+
+### Naming: HabitAgility (user-facing) vs `good-habit-tracker` (infra)
+
+The user-facing brand renamed to **HabitAgility** in v0.10.4 — every `<title>`, header, README, and CLAUDE.md reference. **But the AWS infrastructure kept its historical names**: CDK construct IDs (`GoodHabitTrackerCert`, `GoodHabitTrackerStack`), CloudFormation stack names, DynamoDB tables (`good-habit-tracker-cycles`, `good-habit-tracker-day-checkins`), S3 bucket (`good-habit-tracker-app-...`), Lambda function names (`good-habit-tracker-sync`, `good-habit-tracker-auth`). Renaming any of those is a CloudFormation **replacement** event — data loss for the DDB tables, downtime for the rest. The historical names are stable, work fine, and have no user impact.
+
+When in doubt: **brand-facing = HabitAgility, infra-facing = good-habit-tracker. Do not "consistency-rename" infra without a migration plan.**
 
 ## Critical constraints (read before editing)
 

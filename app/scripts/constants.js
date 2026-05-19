@@ -1,5 +1,5 @@
 /**
- * Shared constants for the Good Habit Tracker front-end.
+ * Shared constants for the HabitAgility front-end.
  * Mirrors values used by the lambda (kept in sync manually; if these drift the
  * UI will compute values that disagree with server-rendered totals).
  */

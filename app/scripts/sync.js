@@ -252,7 +252,7 @@ function renderCloudUnavailable(reason) {
   document.getElementById('app').innerHTML = `
     <div class="shell">
       <div class="card">
-        <div class="mono muted">GOOD HABIT TRACKER</div>
+        <div class="mono muted">HABITAGILITY</div>
         <div style="margin-top:10px; font-size:16px">Cloud unavailable</div>
         <div class="muted" style="margin-top:8px; font-size:13px">${reason}</div>
         <div style="margin-top:10px"><button class="btn primary" data-action="retry-sync">Retry</button></div>

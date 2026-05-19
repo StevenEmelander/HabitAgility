@@ -330,7 +330,7 @@ export function render() {
     document.getElementById('app').innerHTML = `
       <div class="shell">
         <div class="card boot-card">
-          <div class="mono muted">GOOD HABIT TRACKER</div>
+          <div class="mono muted">HABITAGILITY</div>
           <div class="boot-headline">Connecting to cloud data…</div>
           <div class="muted boot-sub">This app is cloud-first and does not use local storage.</div>
         </div>
@@ -356,7 +356,7 @@ export function render() {
   document.getElementById('app').innerHTML = `
     <div class="shell">
       <header class="app-header">
-        <h1 class="app-title">Good Habit Tracker</h1>
+        <h1 class="app-title">HabitAgility</h1>
         <div class="app-header-meta">
           <div class="mono muted app-header-status">${headerSummary}</div>
           ${syncPill}

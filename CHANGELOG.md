@@ -4,6 +4,27 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.10.4] - 2026-05-19
+
+Rebrand + Scrum-vocabulary alignment + Plan-tab date compaction.
+
+### Renamed (user-facing only — infra plumbing keeps "good-habit-tracker" names)
+
+- **App: "Good Habit Tracker" → "HabitAgility".** Updated everywhere a user sees it: page `<title>`, iOS web-app title meta, header bar, boot-screen caption, "cloud unavailable" caption, doc front matter (README, CLAUDE.md).
+- **"Goal" → "Velocity"** in the Plan-tab SCORING section. Matches Scrum terminology — velocity is the sprint's per-day work expectation.
+- **"Step" → "Granularity"** for the per-point increment selector. More explicit than the previous one-syllable label.
+- **Order flipped in SCORING.** Granularity row now appears first (you pick the unit), then Velocity (how many units per day) — natural reading order.
+- **`aria-label`s updated** to match the new labels ("Decrease velocity", "Set granularity to 0.5").
+
+### Fixed (Plan tab dates, round 2)
+
+- **Date layout: inline label + input** on each row (Start and End). The v0.10.3 fix stacked them vertically (input below label) which was correct but tall — each row was ~75 px. Inline gets each row to ~44 px and saves ~50 px total on the sprint card.
+
+### Infrastructure stays as-is
+
+- **Construct IDs, table names, S3 bucket name, Lambda function names, and CloudFormation stack names are all unchanged.** Each of those would be a destroy-and-recreate event under CloudFormation — data loss for the DDB tables, downtime for everything else. The historical `good-habit-tracker-*` names work fine and have no user impact. Project rule documented in CLAUDE.md.
+- **Repository renamed on GitHub** to `habit-agility` (forwards from the old URL; local remote updated). **Domain change deferred** to a follow-up release once a `habitagility.*` domain is registered — see availability check in this release's notes.
+
 ## [0.10.3] - 2026-05-19
 
 ### Fixed

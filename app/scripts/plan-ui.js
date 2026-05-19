@@ -188,14 +188,14 @@ export function renderPlan() {
       </div>
       <div class="plan-section">
         <div class="plan-section-label">SCORING</div>
+        ${renderPointStepSelector(step)}
         <div class="plan-scoring-row">
-          <span class="plan-lbl">Goal:</span>
-          <button type="button" class="btn" data-action="goal-step" data-delta="-1" aria-label="Decrease goal">−</button>
+          <span class="plan-lbl">Velocity:</span>
+          <button type="button" class="btn" data-action="goal-step" data-delta="-1" aria-label="Decrease velocity">−</button>
           <div class="mono plan-stepper-val">${fmtPointsForStep(goal, step)}</div>
-          <button type="button" class="btn" data-action="goal-step" data-delta="1" aria-label="Increase goal">+</button>
+          <button type="button" class="btn" data-action="goal-step" data-delta="1" aria-label="Increase velocity">+</button>
           <span class="muted plan-scoring-unit">pts/day</span>
         </div>
-        ${renderPointStepSelector(step)}
       </div>
     </div>
     ${
@@ -260,10 +260,10 @@ function renderSprintDates(s) {
 function renderPointStepSelector(currentStep) {
   const buttons = POINT_STEPS.map((s) => {
     const active = s === currentStep ? 'primary' : '';
-    return `<button type="button" class="btn ${active}" data-action="point-step" data-step="${s}" aria-label="Set point step to ${fmtPoints(s)}">${fmtPoints(s)}</button>`;
+    return `<button type="button" class="btn ${active}" data-action="point-step" data-step="${s}" aria-label="Set granularity to ${fmtPoints(s)}">${fmtPoints(s)}</button>`;
   }).join('');
   return `<div class="plan-scoring-row plan-scoring-row-step">
-    <span class="plan-lbl">Step:</span>
+    <span class="plan-lbl">Granularity:</span>
     ${buttons}
   </div>`;
 }
