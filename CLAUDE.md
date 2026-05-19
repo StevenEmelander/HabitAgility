@@ -80,11 +80,15 @@ Edge auth checks `htok` cookie (value = SHA-256 hex of deploy token) or `?unlock
 
 ## Deploy
 
+**Deploys go through GitHub Actions — no exceptions.** Push a version tag:
+
 ```bash
-UNLOCK_TOKEN=your-secret-token ./deploy.sh
+git tag 0.7 && git push origin 0.7
 ```
 
-Or `deploy.ps1` on Windows. Scripts echo the bookmarkable unlock URL; they do not rely on CloudFormation outputs for the secret.
+Or trigger manually: GitHub → Actions → "deploy" → Run workflow. The workflow lints, tests, and runs `cdk deploy --all` from `infrastructure/`.
+
+**Local `cdk deploy` is blocked** by `.claude/settings.json` deny rules + a `PreToolUse` hook (`.claude/block-local-deploy.js`) that catches wrapped variants too (e.g. `Push-Location ...; npx cdk deploy`). `deploy.sh` / `deploy.ps1` are kept for reference (what CI runs) but invocation is blocked. If you genuinely need to bypass for a one-off (rare), edit `.claude/settings.json` yourself — Claude can't.
 
 **Legacy DynamoDB:** Older stacks used `good-habit-tracker-state` (and possibly `habit-tracker-state`). After migrating to `good-habit-tracker-cycles` + `good-habit-tracker-day-checkins`, remove any **retained** old tables in **us-west-2** from the AWS console if CloudFormation left them behind.
 

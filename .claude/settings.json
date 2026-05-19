@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "deny": [
+      "Bash(npx cdk deploy*)",
+      "Bash(cdk deploy*)",
+      "Bash(./deploy.sh*)",
+      "Bash(./deploy.ps1*)",
+      "Bash(bash deploy.sh*)",
+      "Bash(sh deploy.sh*)",
+      "Bash(pwsh deploy.ps1*)",
+      "Bash(powershell deploy.ps1*)",
+      "PowerShell(npx cdk deploy*)",
+      "PowerShell(cdk deploy*)",
+      "PowerShell(./deploy.ps1*)",
+      "PowerShell(.\\deploy.ps1*)",
+      "PowerShell(./deploy.sh*)",
+      "PowerShell(pwsh deploy.ps1*)",
+      "PowerShell(powershell deploy.ps1*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/block-local-deploy.js"
+          }
+        ]
+      }
+    ]
+  }
+}
