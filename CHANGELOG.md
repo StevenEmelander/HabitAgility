@@ -4,20 +4,26 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.7] - 2026-05-19
+
 ### Added
 
 - **Burndown chart in Trends → Sprint Overview.** Replaces the daily-points line chart with an Agile-style burndown: a dashed ideal line from `(day 0, totalGoal)` to `(day N, 0)`, and a solid actual line that tracks `totalGoal − cumulative earned` per day. Sitting below the ideal means you're ahead of pace.
 - **PACE metric** alongside POINTS in Sprint Overview. Shows `±N` (color-coded — ahead in accent, behind in danger, on-pace in muted) plus `day X / Y` for at-a-glance progress.
-- **Sprint date pickers in Plan tab.** Native `<input type="date">` for both start and end. End date clamps to start; length recalculates on commit; `change` event re-renders (vs the `input` no-render path used for free-text fields). Future-proofs date editing beyond the ±N stepper.
+- **Sprint date pickers in Plan tab.** Native `<input type="date">` for both start and end. End date clamps to start; length recalculates on commit; `change` event re-renders (vs the `input` no-render path used for free-text fields). Future-proofs date editing beyond the ±N stepper. Pickers stack to a single column below 480 px so iPhone widths don't overflow.
+- **`LIVE` alias on the Lambda@Edge auth function.** Stable handle for monitoring and manual invocation. CloudFront still references the version ARN (Lambda@Edge rejects alias ARNs).
+- **`.claude/settings.json` + `PreToolUse` hook (`block-local-deploy.js`)** that block local `cdk deploy`, `deploy.ps1`, and `deploy.sh` invocation — including substring-matched wrapped variants like `Push-Location infrastructure; npx cdk deploy ...`. Forces deploys through GitHub Actions.
 
 ### Changed
 
-- **Length stepper is now ±14d** (was ±7d), aligning with the default sprint length. Minimum floor for the stepper is 1 day (date pickers can do whatever).
-- **Lambda@Edge auth refresh** publishes a `LIVE` alias on the auth function for monitoring + future architectural options. CloudFront still references the version ARN (Lambda@Edge rejects alias ARNs); the alias is a stable handle for CloudWatch alarms and manual invocation.
+- **Trends Sprint Overview header.** Sprint name (or `Sprint N` fallback) now sits inline between the prev/next arrows instead of a separate row below the muted `SPRINT N` caption. Cleaner, less vertical space, no duplicate identifier.
+- **Empty description/retrospective hide entirely** instead of showing italic "No description." placeholder text. Past + current sprints with no retro still show the editable input so the user can add one; upcoming sprints hide the retro block completely.
+- **POINTS metric reformats to `X / total`** (instead of `X` plus a separate "of total" subtext) with `N left` underneath. Less wrapping on narrow phones. PACE subtext font is smaller for the same reason.
+- **Length stepper is now ±14d** (was ±7d), aligning with the default sprint length. Minimum floor for the stepper is 1 day (date pickers can go anywhere).
 
 ### Removed
 
-- **`temp_drop_edge_auth` CDK context.** Workaround for a perceived export deadlock that was actually caused by missing credentials in the GitHub Actions `production` environment. Normal `cdk deploy --all` token rotations work cleanly; CLAUDE.md documents the rare rollback-stuck recovery path.
+- **`temp_drop_edge_auth` CDK context.** The two-phase deploy workaround is no longer the documented path. Recovery from the rare `ExportsWriter` rollback-stuck state is now: `aws cloudformation continue-update-rollback --resources-to-skip ExportsWriteruswest209BD44F0A7CF058B --stack-name GoodHabitTrackerCert --region us-east-1`, then re-run `cdk deploy --all` via CI.
 
 ## [0.6] - 2026-05-18
 
