@@ -499,13 +499,19 @@ function handleSprintDateChange(target) {
     render();
     return;
   }
-  if (prop === 'startDate') {
-    sprint.startDate = v;
-    if (sprint.endDate < v) sprint.endDate = v;
+  if (!sprint.startDate) {
+    // Planning sprint: dates are derived from (today, today + lengthDays - 1)
+    // for display only. The start input is disabled; only the end input
+    // adjusts duration. The lambda stamps real dates on the first entry.
+    if (prop !== 'endDate') return;
+    const today = todayKey();
+    const newEnd = v < today ? today : v;
+    sprint.lengthDays = daysBetweenInclusive(today, newEnd);
   } else {
-    sprint.endDate = v < sprint.startDate ? sprint.startDate : v;
+    // Started sprint dates are locked in the UI (inputs disabled), so this
+    // handler shouldn't normally fire. Defensive: ignore.
+    return;
   }
-  sprint.lengthDays = daysBetweenInclusive(sprint.startDate, sprint.endDate);
   pushSprint(sprint.id);
   invalidateTrendsAll();
   render();

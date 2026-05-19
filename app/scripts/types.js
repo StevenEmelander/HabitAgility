@@ -41,8 +41,8 @@
 /**
  * @typedef Sprint
  * @property {number}     id            Positive integer; assigned by server on creation.
- * @property {string}     startDate     YYYY-MM-DD.
- * @property {string}     endDate       YYYY-MM-DD.
+ * @property {string|null} startDate    YYYY-MM-DD or null when in "planning" (first entry not yet made).
+ * @property {string|null} endDate      YYYY-MM-DD or null when in "planning"; lambda sets to startDate + lengthDays - 1 on first entry.
  * @property {number}     lengthDays
  * @property {number}     [pointStep]   One of 0.1 / 0.25 / 0.5 / 1; default 1.
  * @property {number}     goalPoints    Daily goal points; default 10 if missing.

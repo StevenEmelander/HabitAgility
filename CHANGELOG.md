@@ -4,6 +4,13 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **"Planning" sprint state.** A sprint created when no other sprint exists (typically the very first one, also any first-sprint-after-a-gap-day via `ensureCurrentSprint`) is born with `startDate = null` and `endDate = null`. The Plan tab renders its start input as today's date (disabled), its end input as `today + lengthDays − 1` (editable — adjusts duration), and tags the day-count line with `· planning`. The lambda's `findCovering` falls back to the lowest-ID planning sprint when no started sprint covers the queried date, so the Entry tab and entry GETs work seamlessly while planning.
+- **First-entry transitions the sprint.** When the lambda's `handlePutEntry` stamps the first entry against a planning sprint, it sets `startDate = entry.dateKey`, `endDate = startDate + lengthDays − 1`, and returns the new dates in `{ sprintStarted: { sprintId, startDate, endDate } }`. The client patches local state on receipt so the UI flips from "PLANNING" to "DAY 1 / N" without a full reload.
+- **Date pickers are locked after start.** Both start and end inputs on the Plan tab are `disabled` once a sprint has a real `startDate`. This trades the escape-hatch for cleaner semantics — sprint dates are immutable once you've actually started doing the work. (`lengthDays` is implicitly locked too, since the buttons that adjusted it were removed in this release.)
+- **`isSprintInPlanning(sprint)` helper** in `scoring.js`, re-exported via `core.js`. Used by Plan UI, Trends UI, and the date-change handler.
+
 ### Removed
 
 - **`±14d` length stepper buttons on the Plan tab.** Redundant with the start/end date pickers — adjust via dates. Length still displays below the date row.
@@ -11,6 +18,8 @@ All notable changes to this project are documented here.
 ### Changed
 
 - **New sprints always default to 14 days** regardless of the prior sprint's length. `pointStep` and `goalPoints` still inherit (they're scoring settings the user has tuned), but length doesn't — the date pickers are the right surface for adjusting a specific sprint's window. Affects both first-sprint creation (`ensureCurrentSprint`) and next-sprint creation (Plan tab → Next).
+- **Trends Sprint Overview gracefully handles planning sprints.** Header shows "Not started yet · N days planned" instead of `null → null`. Metrics and the burndown chart are replaced by a single message pointing to the Entries tab. Retrospective stays hidden (lambda + UI both gate on `canEditRetrospective`, which is false for planning sprints).
+- **Header bar reads `PLANNING`** instead of `DAY N/M` when the current sprint hasn't started yet.
 - **iOS auto-zoom fix.** Sprint name/description inputs, date pickers, and the retrospective textarea bumped to `font-size: 16px`. Safari only auto-zooms on focus when the input font-size is below 16, so this disables the unwanted zoom without touching viewport `user-scalable` (which would block accessibility pinch-zoom).
 
 ## [0.7] - 2026-05-19

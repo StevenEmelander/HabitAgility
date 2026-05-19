@@ -6,9 +6,16 @@ const {
 } = require('@aws-sdk/client-dynamodb');
 const { client } = require('./db');
 const { ROWS_TABLE, PK_DAY } = require('./constants');
-const { nowIso, safeJsonParseObject, isValidDateKey, jsonResponse, plainResponse } = require('./utils');
+const {
+  nowIso,
+  safeJsonParseObject,
+  isValidDateKey,
+  jsonResponse,
+  plainResponse,
+  addDays,
+} = require('./utils');
 const { getMetaRowRaw, bumpBoundsOnPut, recomputeBoundsAfterDelete } = require('./meta');
-const { queryAllSprintDefs, findCovering } = require('./sprints');
+const { queryAllSprintDefs, findCovering, putSprintDef } = require('./sprints');
 const { deleteSprintSummary } = require('./summaries');
 
 // ── Item shape ────────────────────────────────────────────────────────
@@ -118,7 +125,7 @@ async function handlePutEntry(dateKey, body) {
   const values = body.habitValuesById && typeof body.habitValuesById === 'object' ? body.habitValuesById : {};
   // One read covers both the covering-sprint lookup and the bounds bump.
   const [sprints, metaRow] = await Promise.all([queryAllSprintDefs(), getMetaRowRaw()]);
-  const cov = findCovering(sprints, dateKey);
+  let cov = findCovering(sprints, dateKey);
   if (Object.keys(values).length === 0) {
     await deleteEntryRow(dateKey);
     await recomputeBoundsAfterDelete(
@@ -129,10 +136,25 @@ async function handlePutEntry(dateKey, body) {
     if (cov) await deleteSprintSummary(cov.id);
     return jsonResponse(200, { ok: true, deleted: true });
   }
+  // Planning → started transition: if the covering sprint has no startDate yet,
+  // this PUT is its first entry. Stamp the sprint's dates from this entry, then
+  // continue with the normal entry write below.
+  let sprintStarted = null;
+  if (cov && !cov.startDate) {
+    const len = Number(cov.lengthDays) || 0;
+    const newStart = dateKey;
+    const newEnd = len > 0 ? addDays(newStart, len - 1) : newStart;
+    const updated = { ...cov, startDate: newStart, endDate: newEnd };
+    await putSprintDef(updated);
+    cov = updated;
+    sprintStarted = { sprintId: updated.id, startDate: newStart, endDate: newEnd };
+  }
   await putEntryRow(dateKey, values, cov ? cov.id : null);
   await bumpBoundsOnPut(dateKey, metaRow);
   if (cov) await deleteSprintSummary(cov.id);
-  return jsonResponse(200, { ok: true });
+  const resp = { ok: true };
+  if (sprintStarted) resp.sprintStarted = sprintStarted;
+  return jsonResponse(200, resp);
 }
 
 module.exports = {

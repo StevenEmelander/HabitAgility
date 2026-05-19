@@ -84,9 +84,19 @@ export function totalPoints(entry, sprint) {
 // ── Sprint metadata helpers ───────────────────────────────────────────
 
 /**
+ * A sprint is "in planning" when it has no startDate — that is, it was
+ * created but its first entry hasn't been made yet. The lambda stamps
+ * startDate from the first PUT /api/entry that targets the sprint.
+ * @param {Sprint|null} sprint
+ */
+export function isSprintInPlanning(sprint) {
+  return Boolean(sprint && !sprint.startDate);
+}
+
+/**
  * Whether the retrospective field is editable for a given sprint.
  * Editable on past and current sprints; locked on upcoming sprints
- * (those that haven't started yet).
+ * (startDate > today) and planning sprints (no startDate).
  * @param {Sprint|null} sprint
  * @param {string} todayKey  YYYY-MM-DD
  */

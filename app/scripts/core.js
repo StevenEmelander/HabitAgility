@@ -25,6 +25,7 @@ import {
   habitById,
   habitEarned,
   habitsForCategory,
+  isSprintInPlanning,
   pointStep,
   quantize,
   totalPoints,
@@ -51,6 +52,7 @@ export {
   totalPoints,
   canEditRetrospective,
   clampSprintText,
+  isSprintInPlanning,
 };
 
 // ── App state ─────────────────────────────────────────────────────────
@@ -203,6 +205,10 @@ export function viewDayKey() {
 export function sprintInfo() {
   const cur = getCurrentSprint();
   if (!cur) return { sprintNum: 0, day: 0, length: 0, daysLeft: 0, cur: null };
+  // Planning sprint (no startDate yet): day=0 signals "hasn't started", first entry will be day 1.
+  if (!cur.startDate) {
+    return { sprintNum: 0, day: 0, length: cur.lengthDays, daysLeft: cur.lengthDays, cur };
+  }
   const day = Math.max(
     1,
     Math.floor((new Date(todayKey() + 'T00:00:00') - new Date(cur.startDate + 'T00:00:00')) / 86400000) + 1,
@@ -330,7 +336,11 @@ export function render() {
       : syncStatus === 'syncing'
         ? '<div class="pill mono">SYNCING…</div>'
         : '';
-  const headerSummary = info.cur ? `DAY ${info.day}/${info.length}` : 'NO SPRINT';
+  const headerSummary = !info.cur
+    ? 'NO SPRINT'
+    : !info.cur.startDate
+      ? 'PLANNING'
+      : `DAY ${info.day}/${info.length}`;
   document.getElementById('app').innerHTML = `
     <div class="shell">
       <div class="row between" style="gap:10px;align-items:center;flex-wrap:nowrap;margin-bottom:10px">

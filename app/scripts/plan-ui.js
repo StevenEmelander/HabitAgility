@@ -1,6 +1,7 @@
 import { SPRINT_DESC_MAX, SPRINT_NAME_MAX } from './constants.js';
 import {
   POINT_STEPS,
+  addDaysKey,
   escapeHtml,
   fmtPoints,
   fmtPointsForStep,
@@ -9,8 +10,10 @@ import {
   goalForSprint,
   hasAnyEntries,
   isCurrentSprintFirstDay,
+  isSprintInPlanning,
   pointStep,
   state,
+  todayKey,
 } from './core.js';
 
 function planCatAccent(cat) {
@@ -109,28 +112,8 @@ export function renderPlan() {
           autocapitalize="sentences">${escapeHtml(s.description || '')}</textarea>
       </div>
       <div style="font-size:20px;font-weight:700;line-height:1.12;margin-bottom:8px">${fmtPointsForStep(goal, step)}<span class="muted" style="font-size:13px;font-weight:500"> goal/day</span></div>
-      <div class="plan-date-row">
-        <label class="plan-date-field">
-          <span class="plan-lbl">Start</span>
-          <input
-            type="date"
-            class="plan-input plan-date-input"
-            data-field="sprint-start-date"
-            data-sprint-id="${s.id}"
-            value="${s.startDate}" />
-        </label>
-        <label class="plan-date-field">
-          <span class="plan-lbl">End</span>
-          <input
-            type="date"
-            class="plan-input plan-date-input"
-            data-field="sprint-end-date"
-            data-sprint-id="${s.id}"
-            min="${s.startDate}"
-            value="${s.endDate}" />
-        </label>
-      </div>
-      <div class="mono muted" style="font-size:11px;margin-top:6px">${s.lengthDays} day${s.lengthDays === 1 ? '' : 's'}</div>
+      ${renderSprintDates(s)}
+      <div class="mono muted" style="font-size:11px;margin-top:6px">${s.lengthDays} day${s.lengthDays === 1 ? '' : 's'}${isSprintInPlanning(s) ? ' · planning' : ''}</div>
       <div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap;align-items:center">
         <span class="plan-lbl">Goal:</span>
         <button type="button" class="btn" data-action="goal-step" data-delta="-1">−</button>
@@ -147,6 +130,52 @@ export function renderPlan() {
       </div>
     </div>
     ${categories.map((cat) => renderPlanCategory(s, cat, step)).join('')}
+  </div>`;
+}
+
+/**
+ * Date inputs for the sprint card.
+ *
+ * Planning sprint (no startDate yet): start input shows today and is disabled;
+ * end input shows today + lengthDays - 1 and is editable. Changing end adjusts
+ * lengthDays (start stays auto-today). The lambda stamps real startDate +
+ * endDate on the first PUT /api/entry against this sprint.
+ *
+ * Started sprint (startDate set): both inputs are disabled — dates are locked
+ * after the sprint has begun, so the user can't accidentally shift a window
+ * that already has stamped entries.
+ */
+function renderSprintDates(s) {
+  const planning = isSprintInPlanning(s);
+  const today = todayKey();
+  const displayStart = planning ? today : s.startDate;
+  const displayEnd = planning ? addDaysKey(today, Math.max(1, s.lengthDays) - 1) : s.endDate;
+  const startTitle = planning ? 'Auto-set to today; locks to first-entry date' : 'Locked after sprint starts';
+  const endTitle = planning ? 'Adjust the end date to change duration' : 'Locked after sprint starts';
+  return `<div class="plan-date-row">
+    <label class="plan-date-field">
+      <span class="plan-lbl">Start</span>
+      <input
+        type="date"
+        class="plan-input plan-date-input"
+        data-field="sprint-start-date"
+        data-sprint-id="${s.id}"
+        value="${displayStart}"
+        title="${startTitle}"
+        disabled />
+    </label>
+    <label class="plan-date-field">
+      <span class="plan-lbl">End</span>
+      <input
+        type="date"
+        class="plan-input plan-date-input"
+        data-field="sprint-end-date"
+        data-sprint-id="${s.id}"
+        min="${displayStart}"
+        value="${displayEnd}"
+        title="${endTitle}"
+        ${planning ? '' : 'disabled'} />
+    </label>
   </div>`;
 }
 

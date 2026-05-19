@@ -54,14 +54,16 @@ async function putSprintSummary(s) {
   const item = {
     pk: { S: PK_SPRINT_SUM },
     dateKey: { S: String(s.sprintId) },
-    startDate: { S: s.startDate },
-    endDate: { S: s.endDate },
     pts: { N: String(quantize(s.pts)) },
     days: { N: String(s.days) },
     goalPoints: { N: String(quantize(s.goalPoints != null ? s.goalPoints : DEFAULT_GOAL_POINTS)) },
     goalTotal: { N: String(quantize(s.goalTotal || 0)) },
     updatedAt: { S: nowIso() },
   };
+  // Planning sprints have null dates; summary rows mirror sprint defs and only
+  // write the date attributes when set.
+  if (s.startDate) item.startDate = { S: s.startDate };
+  if (s.endDate) item.endDate = { S: s.endDate };
   if (s.name) item.name = { S: String(s.name) };
   await client.send(new PutItemCommand({ TableName: ROWS_TABLE, Item: item }));
 }
@@ -101,10 +103,24 @@ async function queryAllSprintSummaries() {
 
 async function computeSprintSummary(sprint) {
   const { queryEntriesBetween } = require('./entries');
-  const from = sprint.startDate;
-  const to = clampToToday(sprint.endDate);
   const goalPoints = Number(sprint.goalPoints) || DEFAULT_GOAL_POINTS;
   const name = sprint.name || '';
+  // Planning sprints (null dates) yield an empty summary — no aggregated data
+  // until the first entry transitions them to started.
+  if (!sprint.startDate || !sprint.endDate) {
+    return {
+      sprintId: sprint.id,
+      startDate: null,
+      endDate: null,
+      pts: 0,
+      days: 0,
+      goalPoints,
+      goalTotal: 0,
+      name,
+    };
+  }
+  const from = sprint.startDate;
+  const to = clampToToday(sprint.endDate);
   if (from > to) {
     return {
       sprintId: sprint.id,
@@ -157,6 +173,11 @@ async function handleTrendSprintDetail(sprintId) {
   if (!isValidSprintId(sprintId)) return plainResponse(400, 'Invalid sprintId');
   const sprint = await getSprintDef(sprintId);
   if (!sprint) return plainResponse(404, 'Not Found');
+  // Planning sprints have no entries to bucket; return empty buckets so the
+  // client renders the Trends "not started yet" state.
+  if (!sprint.startDate || !sprint.endDate) {
+    return jsonResponse(200, { from: null, to: null, buckets: [] });
+  }
   const from = sprint.startDate;
   const to = clampToToday(sprint.endDate);
   return jsonResponse(200, { from, to, buckets: await buildDailyBuckets(from, to, [sprint]) });
@@ -164,7 +185,9 @@ async function handleTrendSprintDetail(sprintId) {
 
 async function handleTrendSprintSummary() {
   const [sprints, cached] = await Promise.all([queryAllSprintDefs(), queryAllSprintSummaries()]);
-  const missing = sprints.filter((s) => s && s.id != null && !cached.has(s.id));
+  // Exclude planning sprints from the All-Time view — they have no data points.
+  const realSprints = sprints.filter((s) => s && s.id != null && s.startDate && s.endDate);
+  const missing = realSprints.filter((s) => !cached.has(s.id));
   const computed = await Promise.all(
     missing.map(async (s) => {
       const summary = await computeSprintSummary(s);
@@ -173,8 +196,9 @@ async function handleTrendSprintSummary() {
     }),
   );
   for (const s of computed) cached.set(s.sprintId, s);
-  // Drop cached summaries for sprints that no longer exist.
-  const liveIds = new Set(sprints.map((s) => s.id));
+  // Drop cached summaries for sprints that no longer exist (or have since
+  // moved back to planning, though that shouldn't happen).
+  const liveIds = new Set(realSprints.map((s) => s.id));
   const stale = [...cached.keys()].filter((id) => !liveIds.has(id));
   await Promise.all(stale.map(deleteSprintSummary));
   for (const id of stale) cached.delete(id);

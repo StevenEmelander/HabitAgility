@@ -9,7 +9,6 @@ import {
   SPRINT_DEBOUNCE_MS,
 } from './constants.js';
 import {
-  addDaysKey,
   applyOrphanSweepLocally,
   clone,
   load,
@@ -114,6 +113,20 @@ async function flushEntry(dateKey) {
       body: JSON.stringify({ habitValuesById: empty ? {} : entry.habitValuesById }),
     });
     if (!res.ok) throw new Error('entry-put ' + res.status);
+    // First-entry → sprint started: the lambda set startDate + endDate on the
+    // covering sprint. Patch state so the UI reflects the transition without a
+    // full reload.
+    try {
+      const payload = await res.clone().json();
+      if (payload?.sprintStarted) {
+        const { sprintId, startDate, endDate } = payload.sprintStarted;
+        const sprint = state.sprintsById[sprintId];
+        if (sprint) {
+          sprint.startDate = startDate;
+          sprint.endDate = endDate;
+        }
+      }
+    } catch (_) {}
     for (const url of Object.keys(state.trendsCache)) {
       const r = state.trendsCache[url];
       if (r && r.from <= dateKey && dateKey <= r.to) delete state.trendsCache[url];
@@ -263,9 +276,10 @@ async function ensureCurrentSprint() {
       template = await loadSprint(latest.sprintId);
     }
   } catch (_) {}
-  // Sprint length defaults to DEFAULT_SPRINT_LENGTH_DAYS (14) for new sprints —
-  // it does NOT inherit from the previous sprint. pointStep and goalPoints do
-  // inherit, since those are scoring settings the user has tuned.
+  // Sprint is created in "planning" state — null startDate / endDate. The lambda
+  // stamps them on first entry (sets startDate = entry.dateKey, endDate = +length-1).
+  // pointStep and goalPoints inherit from the most recent sprint (scoring tunings),
+  // but length, name, description, retrospective do not.
   const length = DEFAULT_SPRINT_LENGTH_DAYS;
   const pointStep = template?.pointStep || DEFAULT_POINT_STEP;
   const goalPoints =
@@ -275,12 +289,11 @@ async function ensureCurrentSprint() {
   const categories = template ? clone(template.categories || []) : [];
   const habits = template ? clone(template.habitDefinitions || []) : [];
   const newSprint = await createSprint({
-    startDate: today,
-    endDate: addDaysKey(today, length - 1),
+    startDate: null,
+    endDate: null,
     lengthDays: length,
     pointStep,
     goalPoints,
-    // Metadata does not inherit — each sprint starts blank.
     name: '',
     description: '',
     retrospective: '',

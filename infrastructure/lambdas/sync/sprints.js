@@ -43,14 +43,17 @@ function sprintObjectToItem(s) {
   const item = {
     pk: { S: PK_SPRINT_DEF },
     dateKey: { S: String(s.id) },
-    startDate: { S: s.startDate },
-    endDate: { S: s.endDate },
     lengthDays: { N: String(Number(s.lengthDays) || 0) },
     bodyJson: {
       S: JSON.stringify({ categories: s.categories || [], habitDefinitions: s.habitDefinitions || [] }),
     },
     updatedAt: { S: nowIso() },
   };
+  // Dates are optional: a sprint in "planning" state (never had a first entry)
+  // has both dates null. The first PUT /api/entry covering this sprint flips
+  // it to "started" by stamping startDate = entry.dateKey, endDate = +lengthDays-1.
+  if (s.startDate) item.startDate = { S: s.startDate };
+  if (s.endDate) item.endDate = { S: s.endDate };
   if (s.pointStep != null) item.pointStep = { N: String(Number(s.pointStep) || 1) };
   const goal = Number(s.goalPoints);
   item.goalPoints = { N: String(Number.isFinite(goal) && goal >= 0 ? goal : DEFAULT_GOAL_POINTS) };
@@ -101,7 +104,16 @@ async function queryAllSprintDefs() {
 }
 
 function findCovering(sprints, dateKey) {
-  return sprints.find((s) => s && s.startDate <= dateKey && dateKey <= s.endDate) || null;
+  // Started sprints (with set dates) that cover this date take priority.
+  const started = sprints.find(
+    (s) => s?.startDate && s.endDate && s.startDate <= dateKey && dateKey <= s.endDate,
+  );
+  if (started) return started;
+  // Fallback: the lowest-ID planning sprint (null startDate). The user's
+  // first entry into a planning sprint stamps it as started — see
+  // `handlePutEntry` in entries.js.
+  const planning = sprints.filter((s) => s && !s.startDate).sort((a, b) => (a.id || 0) - (b.id || 0))[0];
+  return planning || null;
 }
 
 // ── Route handlers ────────────────────────────────────────────────────
@@ -120,26 +132,32 @@ async function handlePutSprint(sprintId, body) {
 
   if (!isValidSprintId(sprintId)) return plainResponse(400, 'Invalid sprintId');
   if (!body || typeof body !== 'object') return plainResponse(400, 'Invalid body');
-  if (!isValidDateKey(body.startDate) || !isValidDateKey(body.endDate))
-    return plainResponse(400, 'Invalid dates');
+  // Dates are optional (planning sprint), but if either is set, both must be valid.
+  const incomingStart = body.startDate || null;
+  const incomingEnd = body.endDate || null;
+  if (incomingStart && !isValidDateKey(incomingStart)) return plainResponse(400, 'Invalid startDate');
+  if (incomingEnd && !isValidDateKey(incomingEnd)) return plainResponse(400, 'Invalid endDate');
+  if ((incomingStart === null) !== (incomingEnd === null))
+    return plainResponse(400, 'startDate and endDate must both be set or both be null');
 
   const oldSprint = await getSprintDef(sprintId);
   if (!oldSprint) return plainResponse(404, 'Sprint not found');
 
   // Defense in depth: retrospective only editable once the sprint has started.
   // (UI also gates this; lambda enforces in case of direct API use.)
+  // Planning sprint (null startDate) has no started date → also not editable.
   const incomingRetro = body.retrospective;
   if (incomingRetro != null && incomingRetro !== oldSprint.retrospective) {
     const today = todayKey();
-    if (body.startDate > today) {
+    if (!incomingStart || incomingStart > today) {
       return plainResponse(400, 'Retrospective not editable on upcoming sprint');
     }
   }
 
   const updated = {
     id: sprintId,
-    startDate: body.startDate,
-    endDate: body.endDate,
+    startDate: incomingStart,
+    endDate: incomingEnd,
     lengthDays: body.lengthDays,
     pointStep: body.pointStep,
     goalPoints: body.goalPoints,
@@ -177,8 +195,16 @@ async function handlePutSprint(sprintId, body) {
     }
   }
 
-  // Re-stamp sprintId on entries when the sprint's date range changed.
-  if (oldSprint.startDate !== updated.startDate || oldSprint.endDate !== updated.endDate) {
+  // Re-stamp sprintId on entries when the sprint's date range changed —
+  // but only if BOTH sides have real dates (skip planning ↔ planning transitions
+  // and the planning → started transition that handlePutEntry handles directly).
+  if (
+    oldSprint.startDate &&
+    oldSprint.endDate &&
+    updated.startDate &&
+    updated.endDate &&
+    (oldSprint.startDate !== updated.startDate || oldSprint.endDate !== updated.endDate)
+  ) {
     if (!allSprints) allSprints = await queryAllSprintDefs();
     const oldF = oldSprint.startDate;
     const oldT = oldSprint.endDate;
@@ -202,13 +228,18 @@ async function handlePutSprint(sprintId, body) {
 
 async function handlePostSprint(body) {
   if (!body || typeof body !== 'object') return plainResponse(400, 'Invalid body');
-  if (!isValidDateKey(body.startDate) || !isValidDateKey(body.endDate))
-    return plainResponse(400, 'Invalid dates');
+  // Dates are optional (planning sprint), but if either is set, both must be valid.
+  const incomingStart = body.startDate || null;
+  const incomingEnd = body.endDate || null;
+  if (incomingStart && !isValidDateKey(incomingStart)) return plainResponse(400, 'Invalid startDate');
+  if (incomingEnd && !isValidDateKey(incomingEnd)) return plainResponse(400, 'Invalid endDate');
+  if ((incomingStart === null) !== (incomingEnd === null))
+    return plainResponse(400, 'startDate and endDate must both be set or both be null');
   const id = await claimNextSprintId();
   const sprint = {
     id,
-    startDate: body.startDate,
-    endDate: body.endDate,
+    startDate: incomingStart,
+    endDate: incomingEnd,
     lengthDays: body.lengthDays,
     pointStep: body.pointStep,
     goalPoints: body.goalPoints,

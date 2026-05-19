@@ -19,6 +19,7 @@ import {
   fmtPointsForStep,
   goalForSprint,
   habitEarned as habitEarnedFront,
+  isSprintInPlanning,
   pointStep,
   quantize,
   totalPoints,
@@ -266,5 +267,22 @@ describe('clampSprintText', () => {
   it('handles empty / whitespace-only input', () => {
     expect(clampSprintText('', 80)).toBe('');
     expect(clampSprintText('   ', 80)).toBe('');
+  });
+});
+
+describe('isSprintInPlanning', () => {
+  it('null / undefined → false', () => {
+    expect(isSprintInPlanning(null)).toBe(false);
+    expect(isSprintInPlanning(undefined)).toBe(false);
+  });
+
+  it('sprint with no startDate → true', () => {
+    expect(isSprintInPlanning({ id: 1, lengthDays: 14 })).toBe(true);
+    expect(isSprintInPlanning({ id: 1, startDate: null, lengthDays: 14 })).toBe(true);
+    expect(isSprintInPlanning({ id: 1, startDate: '', lengthDays: 14 })).toBe(true);
+  });
+
+  it('sprint with startDate → false (started)', () => {
+    expect(isSprintInPlanning({ id: 1, startDate: '2026-05-19', endDate: '2026-06-01' })).toBe(false);
   });
 });

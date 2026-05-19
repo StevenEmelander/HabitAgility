@@ -8,6 +8,7 @@ import {
   getCurrentSprint,
   getSprintById,
   goalForSprint,
+  isSprintInPlanning,
   pointStep,
   state,
   todayKey,
@@ -165,42 +166,53 @@ function renderSprintOverview() {
   const canEditRetro = canEditRetrospective(sprint, todayKey());
   const heading = name ? escapeHtml(name) : `Sprint ${sprint.id}`;
 
+  const planning = isSprintInPlanning(sprint);
+  const datesLine = planning
+    ? `Not started yet · ${sprint.lengthDays} day${sprint.lengthDays === 1 ? '' : 's'} planned`
+    : `${sprint.startDate} → ${sprint.endDate} · ${sprint.lengthDays} days`;
+
   const header = `<div class="card">
     <div class="row between trends-sprint-nav">
       <button class="btn trends-sprint-navbtn" type="button" data-action="trends-prev" ${prevOk ? '' : 'disabled'} aria-label="Previous sprint">←</button>
       <div class="trends-sprint-title ${name ? '' : 'empty'}">${heading}</div>
       <button class="btn trends-sprint-navbtn" type="button" data-action="trends-next" ${nextOk ? '' : 'disabled'} aria-label="Next sprint">→</button>
     </div>
-    <div class="trends-sprint-dates">${sprint.startDate} → ${sprint.endDate} · ${sprint.lengthDays} days</div>
+    <div class="trends-sprint-dates">${datesLine}</div>
     ${description ? `<div class="trends-sprint-desc">${escapeHtml(description)}</div>` : ''}
   </div>`;
 
-  const metrics = `<div class="grid-metrics">
-    <div class="card">
-      <div class="mono muted">POINTS</div>
-      <div class="stat trends-metric-stat">${fmtPointsForStep(sumPts, step)} / ${fmtPointsForStep(totalGoal, step)}</div>
-      <div class="mono muted trends-metric-sub">${fmtPointsForStep(remaining, step)} left</div>
-    </div>
-    <div class="card">
-      <div class="mono muted">PACE</div>
-      <div class="stat trends-metric-stat ${paceClass}">${paceSign}${fmtPointsForStep(pace, step)}</div>
-      <div class="mono muted trends-metric-sub">${paceLabel} · day ${daysIn} / ${sprint.lengthDays}</div>
-    </div>
-  </div>`;
+  // Planning sprint — no metrics or burndown to show; the user makes the first
+  // entry on the Entry tab and the sprint starts. Skip those cards entirely.
+  const metrics = planning
+    ? ''
+    : `<div class="grid-metrics">
+        <div class="card">
+          <div class="mono muted">POINTS</div>
+          <div class="stat trends-metric-stat">${fmtPointsForStep(sumPts, step)} / ${fmtPointsForStep(totalGoal, step)}</div>
+          <div class="mono muted trends-metric-sub">${fmtPointsForStep(remaining, step)} left</div>
+        </div>
+        <div class="card">
+          <div class="mono muted">PACE</div>
+          <div class="stat trends-metric-stat ${paceClass}">${paceSign}${fmtPointsForStep(pace, step)}</div>
+          <div class="mono muted trends-metric-sub">${paceLabel} · day ${daysIn} / ${sprint.lengthDays}</div>
+        </div>
+      </div>`;
 
   const chartLegend = `goal ${fmtPointsForStep(totalGoal, step)} · ${sprint.lengthDays} days`;
-  const chart = `<div class="card">
-    <div class="row between" style="margin-bottom:8px;gap:8px;align-items:baseline">
-      <div class="mono muted">BURNDOWN</div>
-      <div class="mono muted" style="font-size:11px">${chartLegend}</div>
-    </div>
-    ${buildBurndownChart(actualSeries, totalGoal, sprint.lengthDays)}
-    <div class="row between" style="margin-top:6px;gap:8px">
-      <div class="mono muted" style="font-size:10px">ideal · · ·</div>
-      <div class="mono muted" style="font-size:10px">${loaded ? (buckets.length ? '' : 'no entries yet') : 'loading…'}</div>
-      <div class="mono muted" style="font-size:10px">actual ──</div>
-    </div>
-  </div>`;
+  const chart = planning
+    ? `<div class="card"><div class="muted" style="padding:12px 0;text-align:center;font-size:14px">Sprint hasn't started yet. Make your first entry on the <strong>Entries</strong> tab to begin.</div></div>`
+    : `<div class="card">
+        <div class="row between" style="margin-bottom:8px;gap:8px;align-items:baseline">
+          <div class="mono muted">BURNDOWN</div>
+          <div class="mono muted" style="font-size:11px">${chartLegend}</div>
+        </div>
+        ${buildBurndownChart(actualSeries, totalGoal, sprint.lengthDays)}
+        <div class="row between" style="margin-top:6px;gap:8px">
+          <div class="mono muted" style="font-size:10px">ideal · · ·</div>
+          <div class="mono muted" style="font-size:10px">${loaded ? (buckets.length ? '' : 'no entries yet') : 'loading…'}</div>
+          <div class="mono muted" style="font-size:10px">actual ──</div>
+        </div>
+      </div>`;
 
   // Show the retrospective card when there's content OR the user can edit
   // (past + current sprints). Hide entirely on upcoming sprints with no
