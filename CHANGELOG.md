@@ -4,30 +4,38 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.11.6] - 2026-05-19
+
+The **actual** fix for the cross-region writer deadlock. After staring at the
+CDK source (`cross-region-ssm-writer-handler/index.js`), the rule is plain:
+**no in-place value updates allowed for any existing export key**. The writer
+diffs `OldResourceProperties.exports` against `ResourceProperties.exports` by
+key, and any key whose value changed triggers "Some exports have changed!".
+This is *not* drift detection — it's a hard "this key is immutable once
+written." The 0.11.4 (delete) and 0.11.5 (re-seed) attempts both ignored
+this; the writer doesn't even look at SSM during the check.
+
+Fix: rename the cert construct id from `Cert` → `CertV2`. New logical id →
+new export key `HabitAgilityCertuseast1RefCertV2…`. The writer now sees the
+diff as "add new key + delete old key" instead of "update existing key" and
+proceeds. Main stack picks up the new cross-region reference on next deploy.
+
 ## [0.11.5] - 2026-05-19
 
-Fourth retry — and the **correct** unblock for the cross-region ExportsWriter.
-The previous attempt (0.11.4) deleted the SSM export, which made the failure
-worse: the writer's drift check expects to find its previously-written value
-in SSM, so a missing param trips the same "Some exports have changed!" error
-as a tampered one. Recovery: re-seed the SSM param with the post-rollback cert
-ARN (matches what the writer last successfully wrote in v0.11.0), then
-continue-update-rollback the cert stack back to `UPDATE_ROLLBACK_COMPLETE`.
-The writer's next invocation will see the expected previous value, pass the
-drift check, and update the param to the new (multi-SAN) cert ARN.
-
-No application or CDK code changes — recovery only.
+Fourth retry — re-seeded the SSM export with the post-rollback cert ARN,
+assuming the writer compared template-vs-SSM. It does not (see 0.11.6). No
+application or CDK code changes — failed recovery only.
 
 ## [0.11.4] - 2026-05-19
 
-Third retry of the dual-domain deploy (failed — see 0.11.5 for the actual
+Third retry of the dual-domain deploy (failed — see 0.11.6 for the actual
 fix). Cert stack came back from `UPDATE_ROLLBACK_FAILED` via
 `continue-update-rollback --resources-to-skip ExportsWriteruswest209BD44F0A7CF058B`,
 and the orphan SSM parameter
 `/cdk/exports/HabitAgility/HabitAgilityCertuseast1RefCert5C9FAEC174FEF386` was
 manually deleted from us-west-2. Deletion turned out to be wrong: the CDK
-writer treats a missing previous value the same as a tampered one (drift
-detection). No application or CDK code changes — recovery only.
+writer doesn't read SSM for its check at all (see 0.11.6). No application
+or CDK code changes — recovery only.
 
 ## [0.11.2] - 2026-05-19
 

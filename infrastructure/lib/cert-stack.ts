@@ -28,7 +28,18 @@ export class HabitAgilityCertStack extends cdk.Stack {
     const habitAgilityZone = route53.HostedZone.fromLookup(this, 'HabitAgilityZone', {
       domainName: 'habitagility.com',
     });
-    this.cert = new acm.Certificate(this, 'Cert', {
+    // NOTE: construct id is `CertV2`, not `Cert`. The original `Cert` covered
+    // only `ght.vexom.io`; adding habitagility.com SANs forces ACM to issue
+    // a new physical cert (subject DN changes). Updating the same logical
+    // id would also force the cross-region SSM export to swap value, which
+    // the CDK CrossRegionExportWriter rejects with "Some exports have
+    // changed!" — the writer disallows in-place value updates for any
+    // export key. Renaming the construct gives the new cert a NEW logical
+    // id → NEW export key (`...RefCertV2...`), and the writer sees the
+    // diff as "add new key + delete old key" rather than "update existing
+    // key". The main stack picks up the new cross-region reference on
+    // re-deploy.
+    this.cert = new acm.Certificate(this, 'CertV2', {
       domainName: 'habitagility.com',
       subjectAlternativeNames: ['www.habitagility.com', 'ght.vexom.io'],
       validation: acm.CertificateValidation.fromDnsMultiZone({
