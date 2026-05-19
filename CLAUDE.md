@@ -21,7 +21,7 @@ A self-contained **single-file** web app (`app/tracker.html`) plus a small **AWS
    - `GET /api/trend/sprint/:id` → daily-bucket trend for one sprint: `{ from, to, buckets: [{key, pts, goal, days}, ...] }`.
    - `GET /api/trend/sprint-summary` → `{ summaries: [{sprintId, startDate, endDate, pts, days, goalPoints, goalTotal, name}, ...] }`. Lazy-filled into DDB, invalidated on entry/sprint writes (including name edits).
 
-   **Boot** loads exactly two rows: `GET /api/entry/:today` + `GET /api/sprint/:id` (id from the entry's `sprintId`). Day navigation loads one entry at a time. Trends Sprint Overview fetches one sprint's daily detail; All-Time fetches one summary collection. **Edits** debounce per item: `pushSprint(id)` and `pushEntry(date)` each at 1500ms, keyed by id/date so concurrent edits to different items don't collide. Text edits (name/description/retrospective) flow through a dedicated `input` event listener that updates state and debounces save **without re-rendering** — required to preserve focus + cursor position in textareas.
+   **Boot** loads exactly two rows: `GET /api/entry/:today` + `GET /api/sprint/:id` (id from the entry's `sprintId`). Day navigation loads one entry at a time. The Burndown tab's "This Sprint" view fetches one sprint's daily detail; "All Sprints" fetches one summary collection. **Edits** debounce per item: `pushSprint(id)` and `pushEntry(date)` each at 1500ms, keyed by id/date so concurrent edits to different items don't collide. Text edits (name/description/retrospective) flow through a dedicated `input` event listener that updates state and debounces save **without re-rendering** — required to preserve focus + cursor position in textareas.
 
    **DynamoDB partitions (single table, single physical table name retained for history):**
    - `pk='main#DAY'`, `dateKey` SK — entry rows. Attrs: `valuesJson`, `sprintId`, `updatedAt`.
@@ -36,11 +36,11 @@ A self-contained **single-file** web app (`app/tracker.html`) plus a small **AWS
 
    **Plan-edit nudge:** past day 1 of the current sprint, opening the Plan tab auto-selects the **Next** mode so the user is steered toward editing the upcoming sprint. They can still toggle back to **Current** — when they do, a warning banner reminds them that editing the current sprint's rules can change scores already tallied today.
 
-   **Trends tab (v0.6+):** two modes only.
-   - **Sprint Overview** (default) — prev/next walks every sprint. Shows name, description, an Agile **burndown chart** (ideal line from `(day 0, totalGoal)` → `(day N, 0)`, dashed; actual line from cumulative earned, clamped at 0), POINTS + PACE metrics, and an editable retrospective textarea. Retrospective is locked on upcoming sprints (`startDate > today`) both client- and server-side.
-   - **All-Time** — single chart, one point per sprint at avg pts/day across the user's whole history. Per-sprint legend labels by `name || "Sprint N"`.
+   **Burndown tab (v0.10+, formerly "Trends"):** two modes only. **Note:** internal state, file names, and the `/api/trend/*` route family still use the "trends" name — the rename in v0.10 was UI-only to keep the API and code stable.
+   - **This Sprint** (default; internally `trendsMode: 'sprint'`) — prev/next walks every sprint. Shows name, description, an Agile **burndown chart** (ideal line from `(day 0, totalGoal)` → `(day N, 0)`, dashed; actual line from cumulative earned, clamped at 0; x-axis tick labels at start / mid / end days), POINTS + PACE metrics (PACE prefixed with ↑/↓/· glyph), and an editable retrospective textarea. Retrospective is locked on upcoming sprints (`startDate > today`) both client- and server-side.
+   - **All Sprints** (internally `trendsMode: 'all'`) — single chart, one point per sprint at avg pts/day across the user's whole history. Per-sprint legend labels by `name || "Sprint N"`.
 
-   **Plan-tab dates:** native `<input type="date">` for both start and end (`data-field="sprint-start-date" | "sprint-end-date"`). The `change` event re-renders (length recalculates, end clamps ≥ start); text fields keep the `input` no-render path. A `±14d` stepper coexists for quick length adjustments.
+   **Plan-tab dates:** native `<input type="date">` for both start and end (`data-field="sprint-start-date" | "sprint-end-date"`). The `change` event re-renders (length recalculates, end clamps ≥ start); text fields keep the `input` no-render path. Goal stepper + point-step selector are visually grouped under a "SCORING" caption.
 
 3. **Privacy / telemetry.** No analytics, no third-party fonts or icons, no extra "phone home" beyond your own origin and `/api/*`.
 

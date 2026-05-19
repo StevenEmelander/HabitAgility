@@ -8,8 +8,8 @@ Mobile-first **habit tracker** (vanilla HTML/JS, no frameworks) with an **AWS CD
 
 - User-defined categories and habits, points per habit, configurable **sprint** length (default 14 days). Per-sprint daily `goalPoints` (default 10) plus per-sprint point granularity (0.1 / 0.25 / 0.5 / 1) with step-aware display precision. Count habits can be unlimited (`dailyLimit = 0`).
 - **Sprint identity:** each sprint carries an optional name, planning description, and retrospective. Name appears in the Entry header and All-Time chart legend; retrospective unlocks once the sprint starts.
-- Three tabs: **Entry** (per-day check-ins), **Trends** (Sprint Overview + All-Time), **Plan** (edit current or upcoming sprint).
-- **Strict per-item REST API.** Boot loads exactly two rows (`GET /api/entry/:today` + `GET /api/sprint/:id`). Day navigation loads one entry at a time. Trends fetches one sprint's daily detail, one month's, or all sprint summaries — never the full table. Edits debounce per item (`PUT /api/entry/:date`, `PUT /api/sprint/:id`, `POST /api/sprint`).
+- Three tabs: **Entries** (per-day check-ins), **Burndown** (This Sprint + All Sprints), **Plan** (edit current or upcoming sprint).
+- **Strict per-item REST API.** Boot loads exactly two rows (`GET /api/entry/:today` + `GET /api/sprint/:id`). Day navigation loads one entry at a time. The Burndown tab fetches one sprint's daily detail or all sprint summaries — never the full table. Edits debounce per item (`PUT /api/entry/:date`, `PUT /api/sprint/:id`, `POST /api/sprint`).
 - **Sprint aggregates cached in DynamoDB.** Year and all-time trends read pre-computed sprint summaries; missing summaries are lazy-filled on first view and invalidated on entry/sprint writes.
 - **Server-side orphan-habit sweep:** when a habit is removed from every cycle, the lambda strips its values from every entry row (bounded to cycle ranges) and reports back so the front-end mirrors locally.
 - **No DynamoDB Scans, ever.** Reads are partition-targeted `Query` and `GetItem` only.

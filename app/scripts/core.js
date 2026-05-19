@@ -321,21 +321,25 @@ export function render() {
     document.body.style.overflow = '';
     document.getElementById('app').innerHTML = `
       <div class="shell">
-        <div class="card">
+        <div class="card boot-card">
           <div class="mono muted">GOOD HABIT TRACKER</div>
-          <div style="margin-top:10px; font-size:16px">Connecting to cloud data…</div>
-          <div class="muted" style="margin-top:8px; font-size:13px">This app is cloud-first and does not use local storage.</div>
+          <div class="boot-headline">Connecting to cloud data…</div>
+          <div class="muted boot-sub">This app is cloud-first and does not use local storage.</div>
         </div>
       </div>`;
     return;
   }
   const info = sprintInfo();
+  // Sync state pill: hidden when healthy, "SYNCING…" muted while in flight,
+  // "SYNC FAILED" in danger red on error.
   const syncPill =
     syncStatus === 'error'
-      ? '<div class="pill mono" style="border-color:var(--danger);color:var(--danger)">SYNC FAILED</div>'
+      ? '<div class="pill mono app-sync-pill app-sync-error">SYNC FAILED</div>'
       : syncStatus === 'syncing'
-        ? '<div class="pill mono">SYNCING…</div>'
+        ? '<div class="pill mono app-sync-pill">SYNCING…</div>'
         : '';
+  // Header summary: small mono caption on the right side of the title bar.
+  // Mirrors the per-tab Entry context but is always visible across tabs.
   const headerSummary = !info.cur
     ? 'NO SPRINT'
     : !info.cur.startDate
@@ -343,18 +347,18 @@ export function render() {
       : `DAY ${info.day}/${info.length}`;
   document.getElementById('app').innerHTML = `
     <div class="shell">
-      <div class="row between" style="gap:10px;align-items:center;flex-wrap:nowrap;margin-bottom:10px">
-        <div class="title" style="margin:0;font-size:22px;line-height:1.1">Good Habit Tracker</div>
-        <div class="row" style="margin-left:auto;gap:8px;align-items:center;justify-content:flex-end">
-          <div class="mono muted" style="font-size:11px;white-space:nowrap;text-align:right">${headerSummary}</div>
+      <header class="app-header">
+        <h1 class="app-title">Good Habit Tracker</h1>
+        <div class="app-header-meta">
+          <div class="mono muted app-header-status">${headerSummary}</div>
           ${syncPill}
         </div>
-      </div>
+      </header>
       ${state.tab === 'entry' ? renderEntry() : state.tab === 'trends' ? renderTrends() : renderPlan()}
     </div>
     <nav class="tabs" aria-label="Main">
       <button class="tab ${state.tab === 'entry' ? 'active' : ''}" role="tab" aria-selected="${state.tab === 'entry'}" data-action="tab" data-tab="entry">ENTRIES</button>
-      <button class="tab ${state.tab === 'trends' ? 'active' : ''}" role="tab" aria-selected="${state.tab === 'trends'}" data-action="tab" data-tab="trends">TRENDS</button>
+      <button class="tab ${state.tab === 'trends' ? 'active' : ''}" role="tab" aria-selected="${state.tab === 'trends'}" data-action="tab" data-tab="trends">BURNDOWN</button>
       <button class="tab ${state.tab === 'plan' ? 'active' : ''}" role="tab" aria-selected="${state.tab === 'plan'}" data-action="tab" data-tab="plan">PLAN</button>
     </nav>
     ${state.addHabitDraft ? renderAddHabitModal() : ''}`;

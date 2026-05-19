@@ -51,15 +51,33 @@ function buildLineChart(data, avg, dayCeiling, refY) {
  */
 function buildBurndownChart(actual, totalGoal, lengthDays) {
   const w = 360;
-  const h = 120;
+  // Extra bottom space for the x-axis tick labels.
+  const h = 130;
   const p = 6;
+  const chartBottom = h - 14; // reserve 14 px for the tick label row
   const ceiling = Math.max(totalGoal, actual.length ? Math.max(...actual.map((d) => d.remaining)) : 0, 1);
   const dxPerDay = (w - p * 2) / Math.max(1, lengthDays);
   const x = (d) => p + d * dxPerDay;
-  const y = (v) => p + (h - p * 2) * (1 - v / ceiling);
+  const y = (v) => p + (chartBottom - p) * (1 - v / ceiling);
 
   const idealLine = `<line x1="${x(0).toFixed(1)}" y1="${y(totalGoal).toFixed(1)}" x2="${x(lengthDays).toFixed(1)}" y2="${y(0).toFixed(1)}" stroke="#c79bd9" stroke-width="1.2" stroke-dasharray="4 3"/>`;
   const zeroLine = `<line x1="${p}" y1="${y(0).toFixed(1)}" x2="${w - p}" y2="${y(0).toFixed(1)}" stroke="#4a4a55" stroke-width="0.6" stroke-dasharray="2 4"/>`;
+
+  // Three x-axis tick labels: start (Day 1), midpoint, end (Day N). Help orient
+  // the chart on small screens where there's no other indication of timeline
+  // position.
+  const midDay = Math.max(1, Math.round(lengthDays / 2));
+  const tickY = h - 4;
+  const ticks = [
+    { day: 1, anchor: 'start', x: x(0) + 1 },
+    { day: midDay, anchor: 'middle', x: x(midDay) },
+    { day: lengthDays, anchor: 'end', x: x(lengthDays) - 1 },
+  ]
+    .map(
+      (t) =>
+        `<text x="${t.x.toFixed(1)}" y="${tickY}" text-anchor="${t.anchor}" font-size="9" fill="#7a7a85" font-family="ui-monospace, monospace">d${t.day}</text>`,
+    )
+    .join('');
 
   const pts = actual.map((d) => ({ x: x(d.dayNum), y: y(d.remaining) }));
   const path =
@@ -70,11 +88,12 @@ function buildBurndownChart(actual, totalGoal, lengthDays) {
     .map((q) => `<circle cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="2" fill="#d4a574"/>`)
     .join('');
 
-  return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}">
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" role="img" aria-label="Burndown chart">
     ${zeroLine}
     ${idealLine}
     ${path}
     ${dots}
+    ${ticks}
   </svg>`;
 }
 
@@ -153,6 +172,9 @@ function renderSprintOverview() {
   const paceClass = pace > 0.01 ? 'pace-ahead' : pace < -0.01 ? 'pace-behind' : 'pace-even';
   const paceLabel = pace > 0.01 ? 'ahead' : pace < -0.01 ? 'behind' : 'on pace';
   const paceSign = pace > 0 ? '+' : '';
+  // ↑ ahead of pace (better), ↓ behind (worse), · on pace. Glyph reinforces
+  // the color-coded sign for users who can't easily distinguish accent vs danger.
+  const paceGlyph = pace > 0.01 ? '↑' : pace < -0.01 ? '↓' : '·';
 
   // Prev/next: walk by sprint id (server allocates sequential integers).
   const prevId = sprint.id - 1;
@@ -193,7 +215,7 @@ function renderSprintOverview() {
         </div>
         <div class="card">
           <div class="mono muted">PACE</div>
-          <div class="stat trends-metric-stat ${paceClass}">${paceSign}${fmtPointsForStep(pace, step)}</div>
+          <div class="stat trends-metric-stat ${paceClass}">${paceGlyph} ${paceSign}${fmtPointsForStep(pace, step)}</div>
           <div class="mono muted trends-metric-sub">${paceLabel} · day ${daysIn} / ${sprint.lengthDays}</div>
         </div>
       </div>`;
@@ -277,11 +299,9 @@ function renderAllTime() {
   }));
   const goalLine = goalForSprint(cur);
 
-  const header = `<div class="card">
-    <div class="row between" style="gap:8px;align-items:center">
-      <div class="mono" style="font-size:15px;letter-spacing:0.05em">ALL-TIME</div>
-      <div class="mono muted" style="font-size:11px">${buckets.length} sprint${buckets.length === 1 ? '' : 's'}</div>
-    </div>
+  const header = `<div class="card trends-alltime-header">
+    <div class="trends-alltime-title">ALL SPRINTS</div>
+    <div class="mono muted trends-alltime-count">${buckets.length} sprint${buckets.length === 1 ? '' : 's'}</div>
   </div>`;
 
   const metrics = `<div class="grid-metrics">
@@ -322,9 +342,9 @@ export function renderTrends() {
   const mode = state.trendsMode === 'all' ? 'all' : 'sprint';
   const body = mode === 'all' ? renderAllTime() : renderSprintOverview();
   return `
-    <div class="row" style="margin-bottom:12px;flex-wrap:wrap;gap:8px">
-      <button class="btn ${mode === 'sprint' ? 'primary' : ''}" type="button" data-action="trends-mode" data-mode="sprint">SPRINT OVERVIEW</button>
-      <button class="btn ${mode === 'all' ? 'primary' : ''}" type="button" data-action="trends-mode" data-mode="all">ALL-TIME</button>
+    <div class="trends-mode-switch">
+      <button class="btn ${mode === 'sprint' ? 'primary' : ''}" type="button" data-action="trends-mode" data-mode="sprint">THIS SPRINT</button>
+      <button class="btn ${mode === 'all' ? 'primary' : ''}" type="button" data-action="trends-mode" data-mode="all">ALL SPRINTS</button>
     </div>
     ${body}
   `;

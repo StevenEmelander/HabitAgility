@@ -4,6 +4,39 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.10] - 2026-05-19
+
+UX polish + UI rename pass driven by walking each tab on a phone. **No API
+or data-model changes — UI-only renames keep the internal `trends*` naming
+intact for state, file paths, and the `/api/trend/*` route family.**
+
+### Renamed (UI labels only)
+
+- **Tab `TRENDS` → `BURNDOWN`.** Reflects the centerpiece — the Agile burndown chart is what the tab is for. Internal `state.tab === 'trends'` and `data-tab="trends"` unchanged.
+- **Mode buttons `SPRINT OVERVIEW` → `THIS SPRINT`** and **`ALL-TIME` → `ALL SPRINTS`.** Less jargon, clearer scope of what each view covers.
+- **All-Time header card title `ALL-TIME` → `ALL SPRINTS`** (matches the new mode-button label).
+
+### UX
+
+- **Entry header redesigned.** Sprint name promoted to a prominent line (16 px / 700 weight, truncates with ellipsis) paired with an inline `DAY k / N` chip — or `PLANNING` chip on a planning sprint. Day-in-sprint is computed for the *viewed* date, not just current, so navigating to past days shows the correct day-of-sprint. Day-nav row tightened — arrows are 44×44 with `flex-shrink: 0`, date line centers between them with ellipsis on overflow.
+- **Boolean habit toggle: filled background when on.** Uses the category accent at 18 % alpha (via `color-mix`) for the on-state background and border, plus the label goes 600-weight. Off vs on is now distinguishable from across the room — not just from the `●` vs `○` glyph and color shift.
+- **Global header bar stacks on narrow phones.** Below 420 px viewport width, the title moves to its own line and the status + sync pill drop below it. iPhone SE no longer cramps the "Good Habit Tracker" + "DAY 1/14" + status combo.
+- **Plan tab: Goal stepper + point-step selector visually grouped as `SCORING`.** Border-top, small caption, indented rows — reads as one settings cluster instead of two adjacent button rows that look identical.
+- **Burndown chart: x-axis tick labels.** Three monospace tick labels at chart bottom (`d1` / `d{mid}` / `d{N}`) orient the timeline on narrow phones. Chart height bumped from 120 to 130 px to fit the label row without crowding the data.
+- **Pace metric prefixed with `↑` / `↓` / `·` glyph.** Reinforces the color-coded sign for users who can't easily distinguish accent (gold, ahead) from danger (terracotta, behind) at a glance.
+- **Boot screen and `SYNCING…` / `SYNC FAILED` pills** moved off inline styles into named CSS classes (`.boot-card`, `.boot-headline`, `.app-sync-pill`, `.app-sync-error`) — semantic markup, plus less DOM-string noise.
+
+### Code cleanup
+
+- **Repeated inline `style="..."` patterns moved to CSS classes** wherever I touched a file — new class families: `.app-header*`, `.boot-*`, `.entry-*`, `.plan-scoring*`, `.plan-goal-headline*`, `.plan-length-line`, `.trends-mode-switch`, `.trends-alltime-*`. Render templates are noticeably easier to read; visual tweaks now happen in CSS rather than scattered across `${...}` interpolations.
+- **Dead CSS rules removed.** `.title` (replaced by `.app-title`) and `.plan-sprint-dates` (removed from JS several releases ago).
+- **`dayInSprint(sprint, dateKey)` helper** in `entry-ui.js`. Replaces an ad-hoc `sprintInfo()` reach-through for "what day of the sprint is this viewed date?" — the entry-header day chip needs per-viewed-day computation, not "current sprint, today" semantics.
+- **All buttons that lack visible text labels** (counter `−`/`+`, score-edit `−`/`+`, point-step buttons) gained descriptive `aria-label`s.
+
+### Docs
+
+- `CLAUDE.md` and `README.md` updated for the rename. CLAUDE.md notes explicitly that internal `trendsMode` / `trendsSprintId` / `trends-ui.js` / `/api/trend/*` stay as-is — only user-visible strings changed.
+
 ## [0.9] - 2026-05-19
 
 A coordinated hardening release driven by five specialist agents (PM, security

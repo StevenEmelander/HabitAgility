@@ -8,12 +8,25 @@ import {
   getSprintById,
   goalForSprint,
   habitsForCategory,
+  isSprintInPlanning,
   pointStep,
   state,
   todayKey,
   totalPoints,
   viewDayKey,
 } from './core.js';
+
+/**
+ * Day-in-sprint for a specific viewed date.
+ *   Planning sprint (no startDate) → null (caller renders a "—" or skips).
+ *   Started sprint, dateKey >= startDate → 1-based day index.
+ *   Started sprint, dateKey < startDate → 0 (pre-start; rare).
+ */
+function dayInSprint(sprint, dateKey) {
+  if (!sprint?.startDate) return null;
+  const ms = new Date(dateKey + 'T00:00:00') - new Date(sprint.startDate + 'T00:00:00');
+  return Math.max(0, Math.floor(ms / 86400000) + 1);
+}
 
 export function renderEntry() {
   const dk = viewDayKey();
@@ -40,25 +53,43 @@ export function renderEntry() {
         .toUpperCase();
   const loaded = state._loadedEntryDates.has(dk);
   const fillPct = goal > 0 ? Math.min(100, (pts / goal) * 100) : 0;
-  const sprintName = s?.name ? `<div class="entry-sprint-name">${escapeHtml(s.name)}</div>` : '';
+
+  // Sprint context line: name (if set) + day-in-sprint or planning badge.
+  // Only render when we have meaningful context to show (name OR a real sprint).
+  let sprintContext = '';
+  if (s) {
+    const nameSpan = s.name ? `<span class="entry-sprint-name">${escapeHtml(s.name)}</span>` : '';
+    const dayBadge = isSprintInPlanning(s)
+      ? '<span class="entry-day-badge entry-day-badge-planning">PLANNING</span>'
+      : (() => {
+          const day = dayInSprint(s, dk);
+          if (day == null) return '';
+          return `<span class="entry-day-badge">DAY ${day} / ${s.lengthDays}</span>`;
+        })();
+    if (nameSpan || dayBadge) {
+      sprintContext = `<div class="entry-sprint-ctx">${nameSpan}${dayBadge}</div>`;
+    }
+  }
+
   return `
-    <div class="card">
-      ${sprintName}
-      <div class="row between" style="flex-wrap:wrap;gap:8px;align-items:center">
-        <button class="btn" type="button" data-action="day-prev" aria-label="Previous day">←</button>
-        <div class="col center" style="flex:1;min-width:0">
-          <div class="mono" style="font-size:14px;margin-top:2px">${dateLine}${loaded ? '' : ' · LOADING…'}</div>
-        </div>
-        <button class="btn" type="button" data-action="day-next" ${canNext ? '' : 'disabled'} aria-label="Next day">→</button>
+    <div class="card entry-header">
+      ${sprintContext}
+      <div class="entry-day-nav">
+        <button class="btn entry-nav-btn" type="button" data-action="day-prev" aria-label="Previous day">←</button>
+        <div class="mono entry-date-line">${dateLine}${loaded ? '' : ' · LOADING…'}</div>
+        <button class="btn entry-nav-btn" type="button" data-action="day-next" ${canNext ? '' : 'disabled'} aria-label="Next day">→</button>
       </div>
-      <div class="row between" style="margin-top:12px"><div class="stat">${fmtPointsForStep(pts, step)}</div><div class="mono muted">/ ${fmtPointsForStep(goal, step)}</div></div>
-      <div class="progress" style="margin-top:8px"><div class="fill" style="width:${fillPct}%"></div></div>
+      <div class="entry-stat-row">
+        <div class="stat">${fmtPointsForStep(pts, step)}</div>
+        <div class="mono muted entry-stat-goal">/ ${fmtPointsForStep(goal, step)}</div>
+      </div>
+      <div class="progress entry-progress"><div class="fill" style="width:${fillPct}%"></div></div>
     </div>
     ${
       !s
-        ? `<div class="card"><div class="muted" style="font-size:14px;line-height:1.45">No sprint covers this date.</div></div>`
+        ? `<div class="card"><div class="muted entry-empty">No sprint covers this date.</div></div>`
         : categories.length === 0
-          ? `<div class="card"><div class="muted" style="font-size:14px;line-height:1.45">No habits yet. Open <strong>PLAN</strong>, add categories, then add habits and point rules.</div></div>`
+          ? `<div class="card"><div class="muted entry-empty">No habits yet. Open <strong>PLAN</strong>, add categories, then add habits and point rules.</div></div>`
           : categories.map((cat) => renderEntryCategory(s, e, cat, step)).join('')
     }
   `;
@@ -81,7 +112,17 @@ function renderEntryHabit(h, e, accent, step) {
   if (h.kind === 'boolean') {
     const on = !!v;
     const pts = fmtPointsForStep(h.scoring.points || 0, step);
-    return `<button class="card2 row between habit" data-action="toggle-habit" data-id="${hid}" aria-pressed="${on}" aria-label="${labelText}, ${on ? 'on' : 'off'}, +${pts} points"><div>${labelText}</div><div class="mono" style="color:${on ? accent : 'var(--muted)'}">${on ? '● +' + pts : '○ +' + pts}</div></button>`;
+    // On state gets a filled background using the category accent (low-alpha
+    // tint) so the contrast between done / not-done reads at a glance, not
+    // just from the glyph. Inline style binds the tint to the accent color
+    // since accents vary per category.
+    const onStyle = on
+      ? `background:color-mix(in srgb, ${accent} 18%, var(--card2));border-color:${accent}`
+      : '';
+    return `<button class="card2 row between habit habit-bool ${on ? 'on' : ''}" style="${onStyle}" data-action="toggle-habit" data-id="${hid}" aria-pressed="${on}" aria-label="${labelText}, ${on ? 'on' : 'off'}, +${pts} points">
+      <div class="habit-bool-label">${labelText}</div>
+      <div class="mono habit-bool-pts" style="color:${on ? accent : 'var(--muted)'}">${on ? '✓' : '○'} +${pts}</div>
+    </button>`;
   }
   const n = Number(v || 0);
   const limit = Number(h.scoring.dailyLimit) || 0;

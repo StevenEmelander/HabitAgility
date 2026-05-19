@@ -53,7 +53,6 @@ body {
 
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .muted { color: var(--muted); }
-.title { font-size: 26px; margin: 8px 0 2px; }
 .stat { font-size: 34px; font-weight: 700; line-height: 1; }
 
 .tabs {
@@ -137,7 +136,6 @@ body {
 .plan-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 6px; }
 .plan-seg .btn { width: 100%; justify-content: center; }
 .plan-h { font-size: 10px; letter-spacing: 0.09em; color: var(--muted); margin: 0 0 6px; text-transform: uppercase; }
-.plan-sprint-dates { font-size: 11px; color: var(--muted); margin-top: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .plan-cat-toolbar { padding: 12px 14px; }
 .plan-cat-toolbar-inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
 .plan-cat-toolbar-lbl { font-size: 10px; letter-spacing: 0.09em; color: var(--muted); text-transform: uppercase; }
@@ -232,7 +230,153 @@ body {
 .trends-retro-input { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: #0e0e12; color: var(--text); font-family: inherit; font-size: 16px; line-height: 1.5; min-height: 90px; resize: vertical; }
 .trends-retro-input:focus { outline: none; border-color: var(--accent); }
 .trends-retro-input:disabled { opacity: 0.5; cursor: not-allowed; }
-.entry-sprint-name { font-size: 15px; font-weight: 600; line-height: 1.2; margin-bottom: 4px; }
 .pace-ahead { color: var(--accent); }
 .pace-behind { color: var(--danger); }
 .pace-even { color: var(--muted); }
+
+/* ───────── App header (top bar above all tabs) ───────── */
+/* Two-column: title on the left, status+sync-pill on the right. Stacks on
+   iPhone-SE widths so neither side gets squeezed or wraps awkwardly. */
+.app-header {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 10px;
+}
+.app-title { margin: 0; font-size: 22px; line-height: 1.1; font-weight: 700; }
+.app-header-meta { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.app-header-status { font-size: 11px; white-space: nowrap; text-align: right; }
+.app-sync-pill { font-size: 11px; }
+.app-sync-error { border-color: var(--danger); color: var(--danger); }
+@media (max-width: 420px) {
+  .app-header { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .app-header-meta { align-self: stretch; justify-content: flex-end; }
+}
+
+/* Boot / loading screen */
+.boot-card { padding: 14px; }
+.boot-headline { margin-top: 10px; font-size: 16px; }
+.boot-sub { margin-top: 8px; font-size: 13px; }
+
+/* ───────── Entry tab ───────── */
+.entry-header { padding: 12px; }
+.entry-sprint-ctx {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.entry-sprint-name {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.entry-day-badge {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 8px;
+  flex-shrink: 0;
+}
+.entry-day-badge-planning { color: var(--plan); border-color: var(--plan); }
+
+.entry-day-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.entry-nav-btn { flex-shrink: 0; min-width: 44px; padding: 10px 12px; }
+.entry-date-line {
+  flex: 1;
+  text-align: center;
+  font-size: 14px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entry-stat-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 12px;
+  gap: 8px;
+}
+.entry-stat-goal { font-size: 14px; }
+.entry-progress { margin-top: 8px; }
+.entry-empty { font-size: 14px; line-height: 1.45; }
+
+/* Boolean habit toggle: filled background when on, using the category accent
+   as a tint (set via inline style since the accent varies). Reads at a glance
+   without relying on the glyph + color pair alone. */
+.habit-bool { transition: background 0.12s ease, border-color 0.12s ease; }
+.habit-bool.on .habit-bool-label { font-weight: 600; }
+.habit-bool-pts { font-size: 13px; flex-shrink: 0; }
+
+/* ───────── Plan tab scoring group ───────── */
+.plan-goal-headline {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.12;
+  margin-bottom: 8px;
+}
+.plan-goal-headline-unit {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  margin-left: 4px;
+}
+.plan-length-line { font-size: 11px; margin-top: 6px; }
+
+/* Visually groups the goal stepper + point-step selector under a "SCORING"
+   caption so it reads as one settings cluster, not two adjacent button rows. */
+.plan-scoring {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.plan-scoring-label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.plan-scoring-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.plan-scoring-row-step { margin-top: 8px; gap: 5px; }
+.plan-scoring-unit { font-size: 11px; }
+
+/* ───────── Trends tab ───────── */
+.trends-mode-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.trends-mode-switch .btn { flex: 1; min-width: 120px; justify-content: center; }
+.trends-alltime-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.trends-alltime-title { font-size: 15px; letter-spacing: 0.05em; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.trends-alltime-count { font-size: 11px; }

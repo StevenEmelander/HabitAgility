@@ -118,17 +118,20 @@ export function renderPlan() {
           placeholder="Description / intent for this sprint"
           autocapitalize="sentences">${escapeHtml(s.description || '')}</textarea>
       </div>
-      <div style="font-size:20px;font-weight:700;line-height:1.12;margin-bottom:8px">${fmtPointsForStep(goal, step)}<span class="muted" style="font-size:13px;font-weight:500"> goal/day</span></div>
+      <div class="plan-goal-headline">${fmtPointsForStep(goal, step)}<span class="plan-goal-headline-unit">goal/day</span></div>
       ${renderSprintDates(s)}
-      <div class="mono muted" style="font-size:11px;margin-top:6px">${s.lengthDays} day${s.lengthDays === 1 ? '' : 's'}${isSprintInPlanning(s) ? ' · planning' : ''}</div>
-      <div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap;align-items:center">
-        <span class="plan-lbl">Goal:</span>
-        <button type="button" class="btn" data-action="goal-step" data-delta="-1">−</button>
-        <div class="mono plan-stepper-val">${fmtPointsForStep(goal, step)}</div>
-        <button type="button" class="btn" data-action="goal-step" data-delta="1">+</button>
-        <span class="muted" style="font-size:11px">pts/day</span>
+      <div class="mono muted plan-length-line">${s.lengthDays} day${s.lengthDays === 1 ? '' : 's'}${isSprintInPlanning(s) ? ' · planning' : ''}</div>
+      <div class="plan-scoring">
+        <div class="plan-scoring-label">SCORING</div>
+        <div class="plan-scoring-row">
+          <span class="plan-lbl">Goal:</span>
+          <button type="button" class="btn" data-action="goal-step" data-delta="-1" aria-label="Decrease goal">−</button>
+          <div class="mono plan-stepper-val">${fmtPointsForStep(goal, step)}</div>
+          <button type="button" class="btn" data-action="goal-step" data-delta="1" aria-label="Increase goal">+</button>
+          <span class="muted plan-scoring-unit">pts/day</span>
+        </div>
+        ${renderPointStepSelector(step)}
       </div>
-      ${renderPointStepSelector(step)}
     </div>
     <div class="card plan-cat-toolbar">
       <div class="plan-cat-toolbar-inner">
@@ -189,9 +192,9 @@ function renderSprintDates(s) {
 function renderPointStepSelector(currentStep) {
   const buttons = POINT_STEPS.map((s) => {
     const active = s === currentStep ? 'primary' : '';
-    return `<button type="button" class="btn ${active}" data-action="point-step" data-step="${s}">${fmtPoints(s)}</button>`;
+    return `<button type="button" class="btn ${active}" data-action="point-step" data-step="${s}" aria-label="Set point step to ${fmtPoints(s)}">${fmtPoints(s)}</button>`;
   }).join('');
-  return `<div class="row" style="margin-top:10px;gap:5px;flex-wrap:wrap;align-items:center">
+  return `<div class="plan-scoring-row plan-scoring-row-step">
     <span class="plan-lbl">Step:</span>
     ${buttons}
   </div>`;
