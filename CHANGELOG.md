@@ -4,6 +4,24 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.11.7] - 2026-05-19
+
+Pin the legacy `ght.vexom.io` A-record's CFN logical id to its deployed value
+(`ARECORDE7B57761`). The 0.11.6 deploy got far enough to create the apex +
+`www.` ARecords, update the cross-region ExportsReader, and start the
+CloudFront distribution update — then failed when CFN tried to create
+`ARecordLegacyF2E4EB86` for ght.vexom.io while the original `ARECORDE7B57761`
+still owned that name. Same physical resource under a new construct id
+read as create-then-delete to CFN, which collides. `overrideLogicalId` lets
+CDK adopt the existing record under the new construct without a recreate.
+
+Also unblocked the deploy by manually patching the deployed main stack via
+`aws cloudformation update-stack` to replace the broken `ssm:…:1:1779216106436`
+dynamic ref with a literal cert ARN — CFN evaluates dynamic refs in the
+**deployed** template during changeset creation, and the old timestamp pin
+became unresolvable once the writer rewrote the SSM param. The literal-ARN
+detour gave CDK a clean diff to deploy from.
+
 ## [0.11.6] - 2026-05-19
 
 The **actual** fix for the cross-region writer deadlock. After staring at the

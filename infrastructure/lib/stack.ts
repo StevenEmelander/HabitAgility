@@ -213,11 +213,17 @@ export class HabitAgilityStack extends cdk.Stack {
       recordName: 'www',
       target: cfTarget,
     });
-    new route53.ARecord(this, 'ARecordLegacy', {
+    // The legacy `ght.vexom.io` record was originally a single `ARecord` construct
+    // in this stack (logical id ARECORDE7B57761). Renaming the construct would
+    // cause CFN to create-then-delete — but the create fails because the name is
+    // already taken by the existing record. Pin the logical id so CFN treats
+    // this as a no-op update on the same physical resource.
+    const aRecordLegacy = new route53.ARecord(this, 'ARecordLegacy', {
       zone: vexomZone,
       recordName: 'ght',
       target: cfTarget,
     });
+    (aRecordLegacy.node.defaultChild as cdk.CfnResource).overrideLogicalId('ARECORDE7B57761');
 
     new cdk.CfnOutput(this, 'URL', { value: 'https://habitagility.com' });
     new cdk.CfnOutput(this, 'LegacyURL', { value: 'https://ght.vexom.io' });
