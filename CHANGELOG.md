@@ -15,16 +15,26 @@ and `ddb-meta-20260519-122914.json` are the immediately-pre-wipe snapshots).
 ### Security
 
 - **CloudFront `ResponseHeadersPolicy` on the default behavior.** Adds `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload`, a tight `Content-Security-Policy` (`default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`), `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`. The `/api/*` behavior uses the lighter AWS-managed `SECURITY_HEADERS` policy.
-- **Timing-safe cookie compare** in the Lambda@Edge auth function. Switched both `htok` and `unlock`-querystring hash comparisons from `===` to `crypto.timingSafeEqual` on equal-length hex buffers.
-- **`htok` cookie Max-Age dropped from 365 days to 30 days.** Bounds the impact of a leaked cookie; the user re-unlocks via bookmark or email URL after expiry.
-- **Open-redirect defense** on the unlock-success branch — `request.uri` passes through a `safeRedirectPath` helper that rejects anything not starting with a single `/`.
-- **Security headers on the 403 "private" auth response** (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`).
 - **CloudFront API origin: `QueryStringBehavior.none()`** (was `.all()`). No `/api/*` route reads query strings, so dropping them shrinks attack surface — an `unlock=` param can't accidentally reach the API origin if edge auth is ever bypassed.
 - **64 KiB request-body cap** in `getBody`. Returns 413 before any handler sees an oversized payload; previously the 6 MB Function URL ceiling was the only limit.
 - **Generic 500 error responses.** The catch-all in `index.js` no longer echoes SDK error messages (which could leak table names / ARNs / AWS error codes). Errors are `console.error`-logged server-side; the response body is `{ "error": "internal" }`.
 - **Server-side validation of sprint numeric fields.** New `safeLengthDays`, `safeGoalPoints`, `safePointStep` helpers in `sprints.js` clamp/validate `lengthDays` (1..365 integer), `goalPoints` (0..10000 finite), and `pointStep` (must be one of `[0.1, 0.25, 0.5, 1]`). Defends against `NaN`/non-numeric values from a buggy or hostile client.
 - **`Array.isArray` checks on `body.categories` and `body.habitDefinitions`** in both POST and PUT handlers — previously `body.categories || []` would have happily accepted a non-array value.
 - **`escapeHtml(id)` on every `data-id` attribute** in `plan-ui.js` and `entry-ui.js`. IDs come from `uid()` today so this is hygiene, but the layered defense protects against a future direct-API write of a crafted id.
+
+### Deferred to v0.10 (Lambda@Edge auth hardening)
+
+The security engineer's findings on the auth Lambda — **timing-safe cookie
+compare** (`crypto.timingSafeEqual`), **`htok` Max-Age dropped to 30 days**,
+**`safeRedirectPath` open-redirect guard**, **`nosniff`/`X-Frame-Options`/
+`Referrer-Policy` on the 403 response** — were implemented but **reverted before
+shipping** because any change to the Lambda@Edge code triggers the CDK
+cross-region SSM export deadlock (`ExportsWriteruswest209BD44F0A7CF058B` rejects
+the update because the main stack still imports the old version ARN). Shipping
+them safely requires either the documented 3-step `temp_drop_edge_auth` deploy
+(removed in v0.7 because the user disliked the auth gap) OR a re-architecture
+of the cross-region reference. Tracking as v0.10 work — the CloudFront default
+HSTS+CSP headers already cover the most important client-side guarantees.
 
 ### Cost / observability
 
