@@ -157,7 +157,10 @@ export class HabitAgilityStack extends cdk.Stack {
     });
 
     const distribution = new cloudfront.Distribution(this, 'Distribution', {
-      domainNames: ['ght.vexom.io'],
+      // Dual-domain. habitagility.com is the primary; www.habitagility.com
+      // and ght.vexom.io are kept so old bookmarks and the "www." reflex
+      // both land on the app.
+      domainNames: ['habitagility.com', 'www.habitagility.com', 'ght.vexom.io'],
       certificate: props.cert,
       defaultRootObject: 'tracker.html',
       defaultBehavior: {
@@ -191,14 +194,32 @@ export class HabitAgilityStack extends cdk.Stack {
       distributionPaths: ['/*'],
     });
 
-    // ── Route53 ───────────────────────────────────────────────────────────────
-    const zone = route53.HostedZone.fromLookup(this, 'Zone', { domainName: 'vexom.io' });
-    new route53.ARecord(this, 'ARecord', {
-      zone,
+    // ── Route 53 records ──────────────────────────────────────────────────────
+    // Three A-records (all CloudFront aliases on the same distribution):
+    //   - habitagility.com (apex)         — primary user-facing URL
+    //   - www.habitagility.com            — "www." reflex
+    //   - ght.vexom.io                    — historical bookmark, kept alive
+    const vexomZone = route53.HostedZone.fromLookup(this, 'VexomZone', { domainName: 'vexom.io' });
+    const habitAgilityZone = route53.HostedZone.fromLookup(this, 'HabitAgilityZone', {
+      domainName: 'habitagility.com',
+    });
+    const cfTarget = route53.RecordTarget.fromAlias(new targets.CloudFrontTarget(distribution));
+    new route53.ARecord(this, 'ARecordApex', {
+      zone: habitAgilityZone,
+      target: cfTarget,
+    });
+    new route53.ARecord(this, 'ARecordWww', {
+      zone: habitAgilityZone,
+      recordName: 'www',
+      target: cfTarget,
+    });
+    new route53.ARecord(this, 'ARecordLegacy', {
+      zone: vexomZone,
       recordName: 'ght',
-      target: route53.RecordTarget.fromAlias(new targets.CloudFrontTarget(distribution)),
+      target: cfTarget,
     });
 
-    new cdk.CfnOutput(this, 'URL', { value: 'https://ght.vexom.io' });
+    new cdk.CfnOutput(this, 'URL', { value: 'https://habitagility.com' });
+    new cdk.CfnOutput(this, 'LegacyURL', { value: 'https://ght.vexom.io' });
   }
 }

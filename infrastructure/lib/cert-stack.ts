@@ -20,11 +20,22 @@ export class HabitAgilityCertStack extends cdk.Stack {
     }
     const unlockHash = crypto.createHash('sha256').update(unlockToken).digest('hex');
 
-    // ACM cert — must be in us-east-1 for CloudFront
-    const zone = route53.HostedZone.fromLookup(this, 'Zone', { domainName: 'vexom.io' });
+    // ACM cert — must be in us-east-1 for CloudFront.
+    // Dual-domain: keep the historical ght.vexom.io alive while habitagility.com
+    // becomes the primary user-facing name. Both validate via DNS records in
+    // their respective hosted zones (CertificateValidation.fromDnsMultiZone).
+    const vexomZone = route53.HostedZone.fromLookup(this, 'VexomZone', { domainName: 'vexom.io' });
+    const habitAgilityZone = route53.HostedZone.fromLookup(this, 'HabitAgilityZone', {
+      domainName: 'habitagility.com',
+    });
     this.cert = new acm.Certificate(this, 'Cert', {
-      domainName: 'ght.vexom.io',
-      validation: acm.CertificateValidation.fromDns(zone),
+      domainName: 'habitagility.com',
+      subjectAlternativeNames: ['www.habitagility.com', 'ght.vexom.io'],
+      validation: acm.CertificateValidation.fromDnsMultiZone({
+        'habitagility.com': habitAgilityZone,
+        'www.habitagility.com': habitAgilityZone,
+        'ght.vexom.io': vexomZone,
+      }),
     });
 
     // Lambda@Edge — must be in us-east-1; no environment variables allowed
