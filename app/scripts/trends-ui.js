@@ -163,28 +163,28 @@ function renderSprintOverview() {
   const description = sprint.description || '';
   const retro = sprint.retrospective || '';
   const canEditRetro = canEditRetrospective(sprint, todayKey());
+  const heading = name ? escapeHtml(name) : `Sprint ${sprint.id}`;
 
   const header = `<div class="card">
-    <div class="row between" style="gap:8px;align-items:center;margin-bottom:6px">
-      <button class="btn" type="button" data-action="trends-prev" ${prevOk ? '' : 'disabled'} aria-label="Previous sprint">←</button>
-      <div class="mono muted" style="font-size:11px;letter-spacing:0.07em">SPRINT ${sprint.id}</div>
-      <button class="btn" type="button" data-action="trends-next" ${nextOk ? '' : 'disabled'} aria-label="Next sprint">→</button>
+    <div class="row between trends-sprint-nav">
+      <button class="btn trends-sprint-navbtn" type="button" data-action="trends-prev" ${prevOk ? '' : 'disabled'} aria-label="Previous sprint">←</button>
+      <div class="trends-sprint-title ${name ? '' : 'empty'}">${heading}</div>
+      <button class="btn trends-sprint-navbtn" type="button" data-action="trends-next" ${nextOk ? '' : 'disabled'} aria-label="Next sprint">→</button>
     </div>
-    <div class="trends-sprint-title ${name ? '' : 'empty'}">${name ? escapeHtml(name) : 'Untitled sprint'}</div>
     <div class="trends-sprint-dates">${sprint.startDate} → ${sprint.endDate} · ${sprint.lengthDays} days</div>
-    ${description ? `<div class="trends-sprint-desc">${escapeHtml(description)}</div>` : '<div class="trends-sprint-desc empty">No description.</div>'}
+    ${description ? `<div class="trends-sprint-desc">${escapeHtml(description)}</div>` : ''}
   </div>`;
 
   const metrics = `<div class="grid-metrics">
     <div class="card">
       <div class="mono muted">POINTS</div>
-      <div class="stat" style="font-size:24px">${fmtPointsForStep(sumPts, step)}</div>
-      <div class="mono muted">of ${fmtPointsForStep(totalGoal, step)} · ${fmtPointsForStep(remaining, step)} left</div>
+      <div class="stat trends-metric-stat">${fmtPointsForStep(sumPts, step)} / ${fmtPointsForStep(totalGoal, step)}</div>
+      <div class="mono muted trends-metric-sub">${fmtPointsForStep(remaining, step)} left</div>
     </div>
     <div class="card">
       <div class="mono muted">PACE</div>
-      <div class="stat ${paceClass}" style="font-size:24px">${paceSign}${fmtPointsForStep(pace, step)}</div>
-      <div class="mono muted">${paceLabel} · day ${daysIn} / ${sprint.lengthDays}</div>
+      <div class="stat trends-metric-stat ${paceClass}">${paceSign}${fmtPointsForStep(pace, step)}</div>
+      <div class="mono muted trends-metric-sub">${paceLabel} · day ${daysIn} / ${sprint.lengthDays}</div>
     </div>
   </div>`;
 
@@ -202,23 +202,22 @@ function renderSprintOverview() {
     </div>
   </div>`;
 
-  const retroLabel = canEditRetro
-    ? 'RETROSPECTIVE'
-    : 'RETROSPECTIVE (UPCOMING — UNLOCKS WHEN THE SPRINT STARTS)';
-  const retroPlaceholder = canEditRetro
-    ? 'What worked? What didn’t? What to carry forward?'
-    : 'This sprint hasn’t started yet.';
-  const retroBlock = `<div class="card">
-    <div class="trends-retro-label">${retroLabel}</div>
-    <textarea
-      class="trends-retro-input"
-      data-field="sprint-retrospective"
-      data-sprint-id="${sprint.id}"
-      maxlength="${SPRINT_RETRO_MAX}"
-      placeholder="${retroPlaceholder}"
-      ${canEditRetro ? '' : 'disabled'}
-      autocapitalize="sentences">${escapeHtml(retro)}</textarea>
-  </div>`;
+  // Show the retrospective card when there's content OR the user can edit
+  // (past + current sprints). Hide entirely on upcoming sprints with no
+  // retro yet — no value in showing a locked empty box.
+  const showRetro = retro || canEditRetro;
+  const retroBlock = showRetro
+    ? `<div class="card">
+        <div class="trends-retro-label">RETROSPECTIVE</div>
+        <textarea
+          class="trends-retro-input"
+          data-field="sprint-retrospective"
+          data-sprint-id="${sprint.id}"
+          maxlength="${SPRINT_RETRO_MAX}"
+          placeholder="What worked? What didn’t? What to carry forward?"
+          autocapitalize="sentences">${escapeHtml(retro)}</textarea>
+      </div>`
+    : '';
 
   return `${header}${metrics}${chart}${retroBlock}`;
 }
