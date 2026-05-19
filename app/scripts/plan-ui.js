@@ -108,15 +108,33 @@ export function renderPlan() {
           placeholder="Description / intent for this sprint"
           autocapitalize="sentences">${escapeHtml(s.description || '')}</textarea>
       </div>
-      <div class="row between" style="flex-wrap:wrap;gap:10px;align-items:flex-start">
-        <div style="min-width:0">
-          <div style="font-size:20px;font-weight:700;line-height:1.12">${fmtPointsForStep(goal, step)}<span class="muted" style="font-size:13px;font-weight:500"> goal/day</span></div>
-          <div class="plan-sprint-dates">${s.startDate} → ${s.endDate}</div>
-        </div>
-        <div class="col" style="gap:4px;align-items:flex-end;min-width:fit-content">
-          <div class="row" style="gap:5px"><button type="button" class="btn" data-action="sprint-len" data-delta="-7">−7d</button><button type="button" class="btn" data-action="sprint-len" data-delta="7">+7d</button></div>
-          <span class="mono muted" style="font-size:11px">${s.lengthDays} days</span>
-        </div>
+      <div style="font-size:20px;font-weight:700;line-height:1.12;margin-bottom:8px">${fmtPointsForStep(goal, step)}<span class="muted" style="font-size:13px;font-weight:500"> goal/day</span></div>
+      <div class="plan-date-row">
+        <label class="plan-date-field">
+          <span class="plan-lbl">Start</span>
+          <input
+            type="date"
+            class="plan-input plan-date-input"
+            data-field="sprint-start-date"
+            data-sprint-id="${s.id}"
+            value="${s.startDate}" />
+        </label>
+        <label class="plan-date-field">
+          <span class="plan-lbl">End</span>
+          <input
+            type="date"
+            class="plan-input plan-date-input"
+            data-field="sprint-end-date"
+            data-sprint-id="${s.id}"
+            min="${s.startDate}"
+            value="${s.endDate}" />
+        </label>
+      </div>
+      <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px">
+        <span class="plan-lbl">Length:</span>
+        <button type="button" class="btn" data-action="sprint-len" data-delta="-14">−14d</button>
+        <button type="button" class="btn" data-action="sprint-len" data-delta="14">+14d</button>
+        <span class="mono muted" style="font-size:11px">${s.lengthDays} days</span>
       </div>
       <div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap;align-items:center">
         <span class="plan-lbl">Goal:</span>

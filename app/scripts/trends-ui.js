@@ -1,6 +1,7 @@
 import { SPRINT_RETRO_MAX, TRENDS_CHART_MAX_POINTS } from './constants.js';
 import {
   API_TREND,
+  addDaysKey,
   canEditRetrospective,
   escapeHtml,
   fmtPointsForStep,
@@ -13,7 +14,7 @@ import {
 } from './core.js';
 
 /**
- * Render a line chart with one optional reference line.
+ * Line chart with one optional reference line (still used by All-Time).
  * `refY` (numeric) = y-axis value where a dashed reference line is drawn (skip if null).
  */
 function buildLineChart(data, avg, dayCeiling, refY) {
@@ -36,6 +37,46 @@ function buildLineChart(data, avg, dayCeiling, refY) {
   </svg>`;
 }
 
+/**
+ * Agile burndown chart.
+ *
+ * `actual` is a series of `{ dayNum, remaining }` points, dayNum=0 anchored at
+ * the start of the sprint with remaining=totalGoal; each subsequent dayNum is
+ * end-of-day with the goal reduced by cumulative earned points (clamped at 0).
+ *
+ * The ideal line runs from (0, totalGoal) → (lengthDays, 0): straight, dashed.
+ * The actual line stays AT or ABOVE 0; sitting *below* the ideal means you're
+ * ahead of pace.
+ */
+function buildBurndownChart(actual, totalGoal, lengthDays) {
+  const w = 360;
+  const h = 120;
+  const p = 6;
+  const ceiling = Math.max(totalGoal, actual.length ? Math.max(...actual.map((d) => d.remaining)) : 0, 1);
+  const dxPerDay = (w - p * 2) / Math.max(1, lengthDays);
+  const x = (d) => p + d * dxPerDay;
+  const y = (v) => p + (h - p * 2) * (1 - v / ceiling);
+
+  const idealLine = `<line x1="${x(0).toFixed(1)}" y1="${y(totalGoal).toFixed(1)}" x2="${x(lengthDays).toFixed(1)}" y2="${y(0).toFixed(1)}" stroke="#c79bd9" stroke-width="1.2" stroke-dasharray="4 3"/>`;
+  const zeroLine = `<line x1="${p}" y1="${y(0).toFixed(1)}" x2="${w - p}" y2="${y(0).toFixed(1)}" stroke="#4a4a55" stroke-width="0.6" stroke-dasharray="2 4"/>`;
+
+  const pts = actual.map((d) => ({ x: x(d.dayNum), y: y(d.remaining) }));
+  const path =
+    pts.length > 1
+      ? `<path d="M${pts.map((q) => q.x.toFixed(1) + ',' + q.y.toFixed(1)).join(' L')}" fill="none" stroke="#d4a574" stroke-width="2"/>`
+      : '';
+  const dots = pts
+    .map((q) => `<circle cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="2" fill="#d4a574"/>`)
+    .join('');
+
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}">
+    ${zeroLine}
+    ${idealLine}
+    ${path}
+    ${dots}
+  </svg>`;
+}
+
 /** Downsample a buckets array (server-supplied) to at most maxPts chart points. */
 function downsample(buckets, maxPts) {
   const cap = maxPts || TRENDS_CHART_MAX_POINTS;
@@ -55,7 +96,34 @@ function downsample(buckets, maxPts) {
 // ── Sprint Overview ──────────────────────────────────────────────────
 
 /**
- * Render the focused-sprint overview: name, description, daily-points chart, stats,
+ * Build the actual burndown series for one sprint. Walks each day from
+ * sprint.startDate up to min(sprint.endDate, today), folding bucket points
+ * into a cumulative total; pushes `{ dayNum, remaining }` after each day.
+ *
+ * dayNum=0 → start of sprint, remaining=totalGoal (no work done).
+ * dayNum=k → end of day k, remaining=max(0, totalGoal - cumEarnedThroughDayK).
+ */
+function buildBurndownSeries(sprint, buckets, totalGoal) {
+  const today = todayKey();
+  const series = [];
+  if (sprint.startDate > today) return series; // upcoming — no actual data
+  const lastDay = sprint.endDate < today ? sprint.endDate : today;
+  const ptsByDate = new Map(buckets.map((b) => [b.key, b.pts || 0]));
+  series.push({ dayNum: 0, remaining: totalGoal });
+  let cum = 0;
+  let cur = sprint.startDate;
+  let dayIdx = 1;
+  while (cur <= lastDay && dayIdx <= sprint.lengthDays) {
+    cum += ptsByDate.get(cur) || 0;
+    series.push({ dayNum: dayIdx, remaining: Math.max(0, totalGoal - cum) });
+    cur = addDaysKey(cur, 1);
+    dayIdx++;
+  }
+  return series;
+}
+
+/**
+ * Render the focused-sprint overview: name, description, burndown chart, stats,
  * retrospective textarea, and prev/next navigation.
  */
 function renderSprintOverview() {
@@ -69,20 +137,21 @@ function renderSprintOverview() {
   const url = `${API_TREND}/sprint/${encodeURIComponent(sprint.id)}`;
   const cached = state.trendsCache[url];
   const loaded = !!cached;
-  const buckets = loaded ? (cached.buckets || []).slice() : [];
+  const buckets = loaded ? cached.buckets || [] : [];
 
+  const goalPerDay = goalForSprint(sprint);
+  const totalGoal = goalPerDay * sprint.lengthDays;
   const sumPts = buckets.reduce((s, b) => s + (b.pts || 0), 0);
-  const totalDays = buckets.reduce((s, b) => s + (b.days || 1), 0) || 1;
-  const avgPerDay = sumPts / totalDays;
-  const chartPts = buckets.map((b) => ({ key: b.key, pts: b.days ? b.pts / b.days : b.pts }));
-  const ceilingDayPts = buckets.length
-    ? Math.max(...buckets.map((b) => (b.days ? b.pts / b.days : b.pts)), 1)
-    : 1;
-  const chartDataPts = downsample(chartPts, TRENDS_CHART_MAX_POINTS).map((b) => ({
-    date: b.key,
-    pts: b.pts,
-  }));
-  const goalLine = goalForSprint(sprint);
+  const remaining = Math.max(0, totalGoal - sumPts);
+
+  // Burndown actuals only go up to today (or end-of-sprint, whichever earlier).
+  const actualSeries = buildBurndownSeries(sprint, buckets, totalGoal);
+  const daysIn = actualSeries.length > 0 ? actualSeries[actualSeries.length - 1].dayNum : 0;
+  const idealAtNow = goalPerDay * daysIn;
+  const pace = sumPts - idealAtNow; // +ve = ahead, -ve = behind
+  const paceClass = pace > 0.01 ? 'pace-ahead' : pace < -0.01 ? 'pace-behind' : 'pace-even';
+  const paceLabel = pace > 0.01 ? 'ahead' : pace < -0.01 ? 'behind' : 'on pace';
+  const paceSign = pace > 0 ? '+' : '';
 
   // Prev/next: walk by sprint id (server allocates sequential integers).
   const prevId = sprint.id - 1;
@@ -107,19 +176,31 @@ function renderSprintOverview() {
   </div>`;
 
   const metrics = `<div class="grid-metrics">
-    <div class="card"><div class="mono muted">POINTS</div><div class="stat" style="font-size:24px">${fmtPointsForStep(sumPts, step)}</div><div class="mono muted">over ${totalDays} day${totalDays === 1 ? '' : 's'}</div></div>
-    <div class="card"><div class="mono muted">AVG / DAY</div><div class="stat" style="font-size:24px">${avgPerDay.toFixed(1)}</div><div class="mono muted">goal ${fmtPointsForStep(goalLine, step)}</div></div>
+    <div class="card">
+      <div class="mono muted">POINTS</div>
+      <div class="stat" style="font-size:24px">${fmtPointsForStep(sumPts, step)}</div>
+      <div class="mono muted">of ${fmtPointsForStep(totalGoal, step)} · ${fmtPointsForStep(remaining, step)} left</div>
+    </div>
+    <div class="card">
+      <div class="mono muted">PACE</div>
+      <div class="stat ${paceClass}" style="font-size:24px">${paceSign}${fmtPointsForStep(pace, step)}</div>
+      <div class="mono muted">${paceLabel} · day ${daysIn} / ${sprint.lengthDays}</div>
+    </div>
   </div>`;
 
-  const chart = !buckets.length
-    ? `<div class="card"><div class="muted" style="padding:12px 0">${loaded ? 'No data for this sprint yet.' : 'Loading…'}</div></div>`
-    : `<div class="card">
-        <div class="row between" style="margin-bottom:8px;gap:8px;align-items:baseline">
-          <div class="mono muted">DAILY POINTS</div>
-          <div class="mono muted" style="font-size:11px">avg ${avgPerDay.toFixed(1)} · goal ${fmtPointsForStep(goalLine, step)}</div>
-        </div>
-        ${buildLineChart(chartDataPts, avgPerDay, ceilingDayPts, goalLine)}
-      </div>`;
+  const chartLegend = `goal ${fmtPointsForStep(totalGoal, step)} · ${sprint.lengthDays} days`;
+  const chart = `<div class="card">
+    <div class="row between" style="margin-bottom:8px;gap:8px;align-items:baseline">
+      <div class="mono muted">BURNDOWN</div>
+      <div class="mono muted" style="font-size:11px">${chartLegend}</div>
+    </div>
+    ${buildBurndownChart(actualSeries, totalGoal, sprint.lengthDays)}
+    <div class="row between" style="margin-top:6px;gap:8px">
+      <div class="mono muted" style="font-size:10px">ideal · · ·</div>
+      <div class="mono muted" style="font-size:10px">${loaded ? (buckets.length ? '' : 'no entries yet') : 'loading…'}</div>
+      <div class="mono muted" style="font-size:10px">actual ──</div>
+    </div>
+  </div>`;
 
   const retroLabel = canEditRetro
     ? 'RETROSPECTIVE'

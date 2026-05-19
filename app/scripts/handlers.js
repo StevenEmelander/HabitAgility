@@ -314,7 +314,7 @@ const planActions = {
   'sprint-len': ({ delta }) => {
     const sprint = getPlanModeSprint();
     if (!sprint) return;
-    sprint.lengthDays = Math.max(7, sprint.lengthDays + delta);
+    sprint.lengthDays = Math.max(1, sprint.lengthDays + delta);
     sprint.endDate = addDaysKey(sprint.startDate, sprint.lengthDays - 1);
     pushSprint(sprint.id);
     invalidateTrendsAll();
@@ -468,6 +468,48 @@ function handleSprintTextInput(target) {
   // Intentionally NO render() — keeps focus + cursor position in the field.
 }
 
+// ── Date-field change dispatch ────────────────────────────────────────
+// Sprint start/end dates use the native `<input type="date">` picker. Unlike text
+// fields above we DO want to re-render — the dates fire `change` once committed
+// (not per keystroke), and the lengthDays + sprint-card display must refresh.
+
+const DATE_FIELDS = {
+  'sprint-start-date': 'startDate',
+  'sprint-end-date': 'endDate',
+};
+
+function daysBetweenInclusive(startKey, endKey) {
+  // Same day = 1; tolerates DST by using midnight on each.
+  const ms = new Date(endKey + 'T00:00:00') - new Date(startKey + 'T00:00:00');
+  return Math.max(1, Math.round(ms / 86400000) + 1);
+}
+
+function handleSprintDateChange(target) {
+  const field = target.getAttribute('data-field');
+  const prop = DATE_FIELDS[field];
+  if (!prop) return;
+  const sprintId = Number(target.getAttribute('data-sprint-id'));
+  if (!Number.isFinite(sprintId)) return;
+  const sprint = getSprintById(sprintId);
+  if (!sprint) return;
+  const v = target.value;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+    // Reject invalid / cleared input — re-render snaps the picker back.
+    render();
+    return;
+  }
+  if (prop === 'startDate') {
+    sprint.startDate = v;
+    if (sprint.endDate < v) sprint.endDate = v;
+  } else {
+    sprint.endDate = v < sprint.startDate ? sprint.startDate : v;
+  }
+  sprint.lengthDays = daysBetweenInclusive(sprint.startDate, sprint.endDate);
+  pushSprint(sprint.id);
+  invalidateTrendsAll();
+  render();
+}
+
 export function setupHandlers() {
   document.body.addEventListener('click', (event) => {
     const target = event.target.closest('[data-action]');
@@ -500,5 +542,13 @@ export function setupHandlers() {
     if (!target || !target.matches) return;
     if (!target.matches('[data-field][data-sprint-id]')) return;
     handleSprintTextInput(target);
+  });
+
+  document.body.addEventListener('change', (event) => {
+    if (!state.cloudReady) return;
+    const target = event.target;
+    if (!target || !target.matches) return;
+    if (!target.matches('input[type="date"][data-field][data-sprint-id]')) return;
+    handleSprintDateChange(target);
   });
 }

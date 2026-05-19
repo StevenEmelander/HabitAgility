@@ -191,6 +191,10 @@ body {
 .plan-input:focus { outline: none; border-color: var(--accent); }
 .plan-sprint-name { font-size: 16px; font-weight: 600; }
 .plan-sprint-desc { min-height: 60px; }
+.plan-date-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.plan-date-field { flex: 1 1 140px; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.plan-date-field .plan-lbl { font-size: 10px; letter-spacing: 0.08em; color: var(--muted); text-transform: uppercase; }
+.plan-date-input { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; padding: 8px 10px; color-scheme: dark; }
 
 .trends-sprint-title { font-size: 22px; font-weight: 700; line-height: 1.18; margin: 0 0 4px; }
 .trends-sprint-title.empty { font-style: italic; color: var(--muted); font-weight: 500; }
@@ -202,3 +206,6 @@ body {
 .trends-retro-input:focus { outline: none; border-color: var(--accent); }
 .trends-retro-input:disabled { opacity: 0.5; cursor: not-allowed; }
 .entry-sprint-name { font-size: 15px; font-weight: 600; line-height: 1.2; margin-bottom: 4px; }
+.pace-ahead { color: var(--accent); }
+.pace-behind { color: var(--danger); }
+.pace-even { color: var(--muted); }

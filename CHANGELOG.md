@@ -4,6 +4,21 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **Burndown chart in Trends → Sprint Overview.** Replaces the daily-points line chart with an Agile-style burndown: a dashed ideal line from `(day 0, totalGoal)` to `(day N, 0)`, and a solid actual line that tracks `totalGoal − cumulative earned` per day. Sitting below the ideal means you're ahead of pace.
+- **PACE metric** alongside POINTS in Sprint Overview. Shows `±N` (color-coded — ahead in accent, behind in danger, on-pace in muted) plus `day X / Y` for at-a-glance progress.
+- **Sprint date pickers in Plan tab.** Native `<input type="date">` for both start and end. End date clamps to start; length recalculates on commit; `change` event re-renders (vs the `input` no-render path used for free-text fields). Future-proofs date editing beyond the ±N stepper.
+
+### Changed
+
+- **Length stepper is now ±14d** (was ±7d), aligning with the default sprint length. Minimum floor for the stepper is 1 day (date pickers can do whatever).
+- **Lambda@Edge auth refresh** publishes a `LIVE` alias on the auth function for monitoring + future architectural options. CloudFront still references the version ARN (Lambda@Edge rejects alias ARNs); the alias is a stable handle for CloudWatch alarms and manual invocation.
+
+### Removed
+
+- **`temp_drop_edge_auth` CDK context.** Workaround for a perceived export deadlock that was actually caused by missing credentials in the GitHub Actions `production` environment. Normal `cdk deploy --all` token rotations work cleanly; CLAUDE.md documents the rare rollback-stuck recovery path.
+
 ## [0.6] - 2026-05-18
 
 ### Added

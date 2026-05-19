@@ -37,8 +37,10 @@ A self-contained **single-file** web app (`app/tracker.html`) plus a small **AWS
    **Plan-edit nudge:** past day 1 of the current sprint, opening the Plan tab auto-selects the **Next** mode so the user is steered toward editing the upcoming sprint. They can still toggle back to **Current** — when they do, a warning banner reminds them that editing the current sprint's rules can change scores already tallied today.
 
    **Trends tab (v0.6+):** two modes only.
-   - **Sprint Overview** (default) — prev/next walks every sprint. Shows name, description, daily-points chart with goal reference line, summary stats, and editable retrospective textarea. Retrospective is locked on upcoming sprints (`startDate > today`) both client- and server-side.
+   - **Sprint Overview** (default) — prev/next walks every sprint. Shows name, description, an Agile **burndown chart** (ideal line from `(day 0, totalGoal)` → `(day N, 0)`, dashed; actual line from cumulative earned, clamped at 0), POINTS + PACE metrics, and an editable retrospective textarea. Retrospective is locked on upcoming sprints (`startDate > today`) both client- and server-side.
    - **All-Time** — single chart, one point per sprint at avg pts/day across the user's whole history. Per-sprint legend labels by `name || "Sprint N"`.
+
+   **Plan-tab dates:** native `<input type="date">` for both start and end (`data-field="sprint-start-date" | "sprint-end-date"`). The `change` event re-renders (length recalculates, end clamps ≥ start); text fields keep the `input` no-render path. A `±14d` stepper coexists for quick length adjustments.
 
 3. **Privacy / telemetry.** No analytics, no third-party fonts or icons, no extra "phone home" beyond your own origin and `/api/*`.
 
