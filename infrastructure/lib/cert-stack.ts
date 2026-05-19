@@ -7,7 +7,7 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import type { Construct } from 'constructs';
 
-export class CertStack extends cdk.Stack {
+export class HabitAgilityCertStack extends cdk.Stack {
   readonly cert: acm.Certificate;
   readonly authFnVersion: lambda.Version;
 
@@ -46,9 +46,9 @@ export class CertStack extends cdk.Stack {
     // CDK can't set logRetention here: Edge logs land in the CloudWatch region
     // closest to each viewer. Retention is set on each `/aws/lambda/<region>.…`
     // log group manually in the console (or via a region-fanned-out helper);
-    // tracked as a v0.10 ops follow-up.
+    // tracked as an ops follow-up.
     const authFn = new lambda.Function(this, 'AuthFn', {
-      functionName: 'good-habit-tracker-auth',
+      functionName: 'habit-agility-auth',
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset(authSrcDir),

@@ -1,6 +1,6 @@
 {
-  "name": "good-habit-tracker-infrastructure",
-  "version": "0.3",
+  "name": "habit-agility-infrastructure",
+  "version": "0.11.0",
   "private": true,
   "license": "MIT",
   "scripts": {

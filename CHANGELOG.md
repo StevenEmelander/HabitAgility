@@ -4,6 +4,76 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-05-19
+
+Full rebrand to HabitAgility — completes what v0.10.4 started. **AWS
+infrastructure renamed end-to-end**, repo renamed to PascalCase (matches brand),
+and **all documentation rewritten with a product-marketing voice** instead of
+the previous "personal notes" tone.
+
+### Documentation rewrite
+
+- **README.md** — rewritten from scratch as a marketing landing page. Hero
+  pitch ("treat your habits like a Scrum team treats their work"). Streaks-vs-
+  HabitAgility comparison table. Concept glossary (Sprint / Velocity /
+  Granularity / Burndown / PACE / Retrospective / Planning). Tab-by-tab
+  feature overview. Privacy + ownership section. Quick-start, architecture
+  diagram, costs, shipped + roadmap sections. The repo now reads like an
+  *invitation* to fork and run, not a maintenance log.
+- **CLAUDE.md** — fully aligned to v0.11 infra names; new "Brand vs infra"
+  table is now a single column (all HabitAgility); explicit list of bulk-
+  endpoint / streak / telemetry anti-patterns under "What to avoid".
+- **CONTRIBUTING.md** — sharpened around the deploy-is-CI-only rule, the
+  cross-region rollback recovery procedure, and the new pure-helpers-in-their-
+  own-module pattern that lets `tests/` import without the AWS SDK.
+
+### Infrastructure rename (the big one — full destroy + recreate)
+
+- **CDK stacks renamed**: `GoodHabitTrackerCert` → **`HabitAgilityCert`**,
+  `GoodHabitTracker` → **`HabitAgility`**. The old stacks were deleted via
+  `aws cloudformation delete-stack` after the prior data wipe (no entries or
+  sprint defs to migrate).
+- **DynamoDB tables renamed**: `good-habit-tracker-cycles` → **`habit-agility-meta`**,
+  `good-habit-tracker-day-checkins` → **`habit-agility-rows`**. Construct IDs
+  also renamed for clarity (`CyclesTable` → `MetaTable`, `CheckinsTable` →
+  `RowsTable`) — the new names match what each table actually holds in the
+  current schema (meta row vs DAY/SPRINT_DEF/SPRINT_SUM rows).
+- **Lambda functions renamed**: `good-habit-tracker-sync` → **`habit-agility-sync`**,
+  `good-habit-tracker-auth` → **`habit-agility-auth`**.
+- **S3 bucket renamed**: `good-habit-tracker-app-{account}` →
+  **`habit-agility-app-{account}`**.
+- **Stack interface renamed**: `GoodHabitTrackerStackProps` → `HabitAgilityStackProps`;
+  class `GoodHabitTrackerStack` → `HabitAgilityStack`; `CertStack` →
+  `HabitAgilityCertStack`.
+- **Lambda env-var names retained** (`CYCLES_TABLE_NAME`, `ENTRIES_TABLE_NAME`)
+  to avoid changing the lambda source in this release. The names are now
+  misleading; they'll be renamed to `META_TABLE_NAME` / `ROWS_TABLE_NAME` in
+  a follow-up patch alongside their `require()` consumers in `constants.js`.
+
+### Orphan resources from the destroy
+
+- **`good-habit-tracker-auth` Lambda@Edge** remained after stack delete
+  because edge replicas take hours to clear; it's a no-op orphan and was
+  detached from the deleted stack via `--retain-resources`. AWS will let it
+  delete cleanly in a few hours.
+- **Old DDB tables and S3 bucket** were `RemovalPolicy.RETAIN`; they survived
+  the stack delete as empty orphans. Cleaned up out-of-band via the AWS CLI
+  after the new stacks deploy successfully.
+
+### GitHub repo rename
+
+- `StevenEmelander/good-habit-tracker` → `StevenEmelander/habit-agility` (in
+  v0.10.4) → **`StevenEmelander/HabitAgility`** (in v0.11, PascalCase matching
+  the brand exactly). Old URLs auto-forward; local git remote updated.
+
+### `package.json` updates
+
+- Root `package.json`: name `good-habit-tracker` → `habit-agility`, version
+  bumped to 0.11.0.
+- `infrastructure/package.json`: name `good-habit-tracker-infrastructure` →
+  `habit-agility-infrastructure`, version bumped to 0.11.0.
+- Lockfiles regenerated.
+
 ## [0.10.4] - 2026-05-19
 
 Rebrand + Scrum-vocabulary alignment + Plan-tab date compaction.

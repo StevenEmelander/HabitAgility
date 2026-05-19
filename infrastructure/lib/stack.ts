@@ -13,13 +13,13 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import type { Construct } from 'constructs';
 
-interface GoodHabitTrackerStackProps extends cdk.StackProps {
+interface HabitAgilityStackProps extends cdk.StackProps {
   cert: acm.Certificate;
   authFnVersion: lambda.Version;
 }
 
-export class GoodHabitTrackerStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props: GoodHabitTrackerStackProps) {
+export class HabitAgilityStack extends cdk.Stack {
+  constructor(scope: Construct, id: string, props: HabitAgilityStackProps) {
     super(scope, id, props);
 
     const unlockToken = this.node.tryGetContext('unlock_token') as string;
@@ -32,20 +32,24 @@ export class GoodHabitTrackerStack extends cdk.Stack {
       .digest('hex')
       .slice(0, 32);
 
-    // ── DynamoDB: cycle definitions (date ranges, categories, habits/scoring) + per-day entries ─
-    // PITR is enabled on both — point-in-time recovery up to 35 days back protects
-    // against a bad client write or orphan-sweep regression. Cost is ~$0.20/GB-month
-    // at this scale (pennies for a single-user store).
-    const cyclesTable = new dynamodb.Table(this, 'CyclesTable', {
-      tableName: 'good-habit-tracker-cycles',
+    // ── DynamoDB ─────────────────────────────────────────────────────────────
+    // Two physical tables:
+    //   habit-agility-meta — single-row meta (nextSprintId, entryDateMin/Max)
+    //   habit-agility-rows — sprint defs, summary rows, and per-day entries
+    //                        all under one table, separated by `pk` prefix.
+    // PITR enabled on both — recovery up to 35 days back protects against a
+    // bad client write or orphan-sweep regression. ~$0.20/GB-month — pennies
+    // for a single-user store.
+    const metaTable = new dynamodb.Table(this, 'MetaTable', {
+      tableName: 'habit-agility-meta',
       partitionKey: { name: 'id', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
       pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
     });
-    /** One partition `DAY`, sort key ISO date — Query by range (no full table Scans on read). */
-    const entriesTable = new dynamodb.Table(this, 'CheckinsTable', {
-      tableName: 'good-habit-tracker-day-checkins',
+    /** Query by partition + sort-key range — no full table Scans on read. */
+    const rowsTable = new dynamodb.Table(this, 'RowsTable', {
+      tableName: 'habit-agility-rows',
       partitionKey: { name: 'pk', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'dateKey', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
@@ -62,25 +66,29 @@ export class GoodHabitTrackerStack extends cdk.Stack {
     // deprecated in favor of `logGroup`, but the deprecated path uses a custom
     // resource that gracefully modifies an existing log group; the modern
     // `logGroup` path tries to CREATE the log group, which fails when Lambda
-    // already auto-created it on its first invocation. Sticking with the
-    // working API until CDK provides a migration path that doesn't require
-    // manual log-group deletion.)
+    // already auto-created it on its first invocation.)
+    //
+    // Env var names retained for lambda-source backward compatibility:
+    //   CYCLES_TABLE_NAME points at the new meta table
+    //   ENTRIES_TABLE_NAME points at the new rows table
+    // The lambda source can be migrated to META_TABLE_NAME / ROWS_TABLE_NAME
+    // in a follow-up patch.
     const syncFn = new lambda.Function(this, 'SyncFn', {
-      functionName: 'good-habit-tracker-sync',
+      functionName: 'habit-agility-sync',
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset(path.join(__dirname, '../lambdas/sync')),
       memorySize: 256,
       environment: {
-        CYCLES_TABLE_NAME: cyclesTable.tableName,
-        ENTRIES_TABLE_NAME: entriesTable.tableName,
+        CYCLES_TABLE_NAME: metaTable.tableName,
+        ENTRIES_TABLE_NAME: rowsTable.tableName,
         CF_SECRET: cfSecret,
       },
       timeout: cdk.Duration.seconds(45),
       logRetention: logs.RetentionDays.ONE_MONTH,
     });
-    cyclesTable.grantReadWriteData(syncFn);
-    entriesTable.grantReadWriteData(syncFn);
+    metaTable.grantReadWriteData(syncFn);
+    rowsTable.grantReadWriteData(syncFn);
 
     const syncUrl = syncFn.addFunctionUrl({ authType: lambda.FunctionUrlAuthType.NONE });
     const syncDomain = cdk.Fn.select(2, cdk.Fn.split('/', syncUrl.url));
@@ -90,7 +98,7 @@ export class GoodHabitTrackerStack extends cdk.Stack {
     // overwrite. Noncurrent versions auto-expire after 30 days to keep storage
     // bounded.
     const bucket = new s3.Bucket(this, 'AppBucket', {
-      bucketName: `good-habit-tracker-app-${this.account}`,
+      bucketName: `habit-agility-app-${this.account}`,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
       versioned: true,
