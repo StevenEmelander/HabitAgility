@@ -1,49 +1,53 @@
-Ôªø# Changelog
+# Changelog
 
 All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-05-19
+
+Retry deploy after the v0.11.1 cross-region ExportsWriter snag (cert ARN replacement). Cert stack was recovered with continue-update-rollback (resources-to-skip ExportsWriter). No code changes ó this is just a re-attempt of the v0.11.1 dual-domain deploy.
+
 ## [0.11.0] - 2026-05-19
 
-Full rebrand to HabitAgility ‚Äî completes what v0.10.4 started. **AWS
+Full rebrand to HabitAgility ó completes what v0.10.4 started. **AWS
 infrastructure renamed end-to-end**, repo renamed to PascalCase (matches brand),
 and **all documentation rewritten with a product-marketing voice** instead of
 the previous "personal notes" tone.
 
 ### Documentation rewrite
 
-- **README.md** ‚Äî rewritten from scratch as a marketing landing page. Hero
+- **README.md** ó rewritten from scratch as a marketing landing page. Hero
   pitch ("treat your habits like a Scrum team treats their work"). Streaks-vs-
   HabitAgility comparison table. Concept glossary (Sprint / Velocity /
   Granularity / Burndown / PACE / Retrospective / Planning). Tab-by-tab
   feature overview. Privacy + ownership section. Quick-start, architecture
   diagram, costs, shipped + roadmap sections. The repo now reads like an
   *invitation* to fork and run, not a maintenance log.
-- **CLAUDE.md** ‚Äî fully aligned to v0.11 infra names; new "Brand vs infra"
+- **CLAUDE.md** ó fully aligned to v0.11 infra names; new "Brand vs infra"
   table is now a single column (all HabitAgility); explicit list of bulk-
   endpoint / streak / telemetry anti-patterns under "What to avoid".
-- **CONTRIBUTING.md** ‚Äî sharpened around the deploy-is-CI-only rule, the
+- **CONTRIBUTING.md** ó sharpened around the deploy-is-CI-only rule, the
   cross-region rollback recovery procedure, and the new pure-helpers-in-their-
   own-module pattern that lets `tests/` import without the AWS SDK.
 
-### Infrastructure rename (the big one ‚Äî full destroy + recreate)
+### Infrastructure rename (the big one ó full destroy + recreate)
 
-- **CDK stacks renamed**: `GoodHabitTrackerCert` ‚Üí **`HabitAgilityCert`**,
-  `GoodHabitTracker` ‚Üí **`HabitAgility`**. The old stacks were deleted via
+- **CDK stacks renamed**: `GoodHabitTrackerCert` ? **`HabitAgilityCert`**,
+  `GoodHabitTracker` ? **`HabitAgility`**. The old stacks were deleted via
   `aws cloudformation delete-stack` after the prior data wipe (no entries or
   sprint defs to migrate).
-- **DynamoDB tables renamed**: `good-habit-tracker-cycles` ‚Üí **`habit-agility-meta`**,
-  `good-habit-tracker-day-checkins` ‚Üí **`habit-agility-rows`**. Construct IDs
-  also renamed for clarity (`CyclesTable` ‚Üí `MetaTable`, `CheckinsTable` ‚Üí
-  `RowsTable`) ‚Äî the new names match what each table actually holds in the
+- **DynamoDB tables renamed**: `good-habit-tracker-cycles` ? **`habit-agility-meta`**,
+  `good-habit-tracker-day-checkins` ? **`habit-agility-rows`**. Construct IDs
+  also renamed for clarity (`CyclesTable` ? `MetaTable`, `CheckinsTable` ?
+  `RowsTable`) ó the new names match what each table actually holds in the
   current schema (meta row vs DAY/SPRINT_DEF/SPRINT_SUM rows).
-- **Lambda functions renamed**: `good-habit-tracker-sync` ‚Üí **`habit-agility-sync`**,
-  `good-habit-tracker-auth` ‚Üí **`habit-agility-auth`**.
-- **S3 bucket renamed**: `good-habit-tracker-app-{account}` ‚Üí
+- **Lambda functions renamed**: `good-habit-tracker-sync` ? **`habit-agility-sync`**,
+  `good-habit-tracker-auth` ? **`habit-agility-auth`**.
+- **S3 bucket renamed**: `good-habit-tracker-app-{account}` ?
   **`habit-agility-app-{account}`**.
-- **Stack interface renamed**: `GoodHabitTrackerStackProps` ‚Üí `HabitAgilityStackProps`;
-  class `GoodHabitTrackerStack` ‚Üí `HabitAgilityStack`; `CertStack` ‚Üí
+- **Stack interface renamed**: `GoodHabitTrackerStackProps` ? `HabitAgilityStackProps`;
+  class `GoodHabitTrackerStack` ? `HabitAgilityStack`; `CertStack` ?
   `HabitAgilityCertStack`.
 - **Lambda env-var names retained** (`CYCLES_TABLE_NAME`, `ENTRIES_TABLE_NAME`)
   to avoid changing the lambda source in this release. The names are now
@@ -62,15 +66,15 @@ the previous "personal notes" tone.
 
 ### GitHub repo rename
 
-- `StevenEmelander/good-habit-tracker` ‚Üí `StevenEmelander/habit-agility` (in
-  v0.10.4) ‚Üí **`StevenEmelander/HabitAgility`** (in v0.11, PascalCase matching
+- `StevenEmelander/good-habit-tracker` ? `StevenEmelander/habit-agility` (in
+  v0.10.4) ? **`StevenEmelander/HabitAgility`** (in v0.11, PascalCase matching
   the brand exactly). Old URLs auto-forward; local git remote updated.
 
 ### `package.json` updates
 
-- Root `package.json`: name `good-habit-tracker` ‚Üí `habit-agility`, version
+- Root `package.json`: name `good-habit-tracker` ? `habit-agility`, version
   bumped to 0.11.0.
-- `infrastructure/package.json`: name `good-habit-tracker-infrastructure` ‚Üí
+- `infrastructure/package.json`: name `good-habit-tracker-infrastructure` ?
   `habit-agility-infrastructure`, version bumped to 0.11.0.
 - Lockfiles regenerated.
 
@@ -78,28 +82,28 @@ the previous "personal notes" tone.
 
 Rebrand + Scrum-vocabulary alignment + Plan-tab date compaction.
 
-### Renamed (user-facing only ‚Äî infra plumbing keeps "good-habit-tracker" names)
+### Renamed (user-facing only ó infra plumbing keeps "good-habit-tracker" names)
 
-- **App: "Good Habit Tracker" ‚Üí "HabitAgility".** Updated everywhere a user sees it: page `<title>`, iOS web-app title meta, header bar, boot-screen caption, "cloud unavailable" caption, doc front matter (README, CLAUDE.md).
-- **"Goal" ‚Üí "Velocity"** in the Plan-tab SCORING section. Matches Scrum terminology ‚Äî velocity is the sprint's per-day work expectation.
-- **"Step" ‚Üí "Granularity"** for the per-point increment selector. More explicit than the previous one-syllable label.
-- **Order flipped in SCORING.** Granularity row now appears first (you pick the unit), then Velocity (how many units per day) ‚Äî natural reading order.
+- **App: "Good Habit Tracker" ? "HabitAgility".** Updated everywhere a user sees it: page `<title>`, iOS web-app title meta, header bar, boot-screen caption, "cloud unavailable" caption, doc front matter (README, CLAUDE.md).
+- **"Goal" ? "Velocity"** in the Plan-tab SCORING section. Matches Scrum terminology ó velocity is the sprint's per-day work expectation.
+- **"Step" ? "Granularity"** for the per-point increment selector. More explicit than the previous one-syllable label.
+- **Order flipped in SCORING.** Granularity row now appears first (you pick the unit), then Velocity (how many units per day) ó natural reading order.
 - **`aria-label`s updated** to match the new labels ("Decrease velocity", "Set granularity to 0.5").
 
 ### Fixed (Plan tab dates, round 2)
 
-- **Date layout: inline label + input** on each row (Start and End). The v0.10.3 fix stacked them vertically (input below label) which was correct but tall ‚Äî each row was ~75 px. Inline gets each row to ~44 px and saves ~50 px total on the sprint card.
+- **Date layout: inline label + input** on each row (Start and End). The v0.10.3 fix stacked them vertically (input below label) which was correct but tall ó each row was ~75 px. Inline gets each row to ~44 px and saves ~50 px total on the sprint card.
 
 ### Infrastructure stays as-is
 
-- **Construct IDs, table names, S3 bucket name, Lambda function names, and CloudFormation stack names are all unchanged.** Each of those would be a destroy-and-recreate event under CloudFormation ‚Äî data loss for the DDB tables, downtime for everything else. The historical `good-habit-tracker-*` names work fine and have no user impact. Project rule documented in CLAUDE.md.
-- **Repository renamed on GitHub** to `habit-agility` (forwards from the old URL; local remote updated). **Domain change deferred** to a follow-up release once a `habitagility.*` domain is registered ‚Äî see availability check in this release's notes.
+- **Construct IDs, table names, S3 bucket name, Lambda function names, and CloudFormation stack names are all unchanged.** Each of those would be a destroy-and-recreate event under CloudFormation ó data loss for the DDB tables, downtime for everything else. The historical `good-habit-tracker-*` names work fine and have no user impact. Project rule documented in CLAUDE.md.
+- **Repository renamed on GitHub** to `habit-agility` (forwards from the old URL; local remote updated). **Domain change deferred** to a follow-up release once a `habitagility.*` domain is registered ó see availability check in this release's notes.
 
 ## [0.10.3] - 2026-05-19
 
 ### Fixed
 
-- **Date pickers no longer overflow** on the Plan tab. Previous layout was a `1fr 1fr` CSS grid that stacked to `1fr` at `‚â§480 px` viewport. The `1fr` default is `minmax(auto, 1fr)`, meaning the column can't shrink below the date input's intrinsic content width ‚Äî so on viewports just above the breakpoint (iPad mini portrait 768 px, iPhone Pro Max landscape, Safari split-screen) the END date overflowed its column even though START fit. Verified at iPhone width with the page rendered in a 388 px simulator: the previous grid showed the END date and its calendar icon spilling past the card; the new flex-column layout fits both inputs cleanly within the boundary. Trades trivial vertical space (one extra row) for zero overflow risk at any viewport.
+- **Date pickers no longer overflow** on the Plan tab. Previous layout was a `1fr 1fr` CSS grid that stacked to `1fr` at `=480 px` viewport. The `1fr` default is `minmax(auto, 1fr)`, meaning the column can't shrink below the date input's intrinsic content width ó so on viewports just above the breakpoint (iPad mini portrait 768 px, iPhone Pro Max landscape, Safari split-screen) the END date overflowed its column even though START fit. Verified at iPhone width with the page rendered in a 388 px simulator: the previous grid showed the END date and its calendar icon spilling past the card; the new flex-column layout fits both inputs cleanly within the boundary. Trades trivial vertical space (one extra row) for zero overflow risk at any viewport.
 
 ## [0.10.2] - 2026-05-19
 
@@ -107,19 +111,19 @@ Plan-tab compaction. The 0.10.1 "restructure" just added section labels; this
 release actually cuts visible chrome to make the tab usable on a phone without
 endless scrolling.
 
-### UX (Plan tab) ‚Äî measured before/after on iPhone widths
+### UX (Plan tab) ó measured before/after on iPhone widths
 
-- **Habit row collapsed to one line.** Was `[name] [‚úé] [YES/NO] [‚úï]` + `Points: [‚àí][1][+]` (~100 px tall per habit, ~132 px of trailing buttons). Now `[name] [stepper] [‚ãØ]` on a single row ‚Äî count habits add a small "‚â§N" stepper on a second line. Per-habit height ~52 px. **For a sprint with 9 habits, that's ~430 px of vertical space recovered.** Drops the "Points:" / "Limit:" labels (steppers carry the unit in the value: `+1`, `+0.5/u`, `‚â§4`).
-- **Category card header trimmed.** Was `[CATEGORY] [Name] [+ Habit] [Remove]` (~88 px header per category). Now `[CATEGORY] [count badge] [+ Habit] [‚ãØ]` ‚Äî Rename and Remove move into the `‚ãØ` menu (rare actions, freed up width). The small count badge gives instant visibility into how many habits live there.
-- **Generic action-menu modal** replaces the inline per-row triplet of icon buttons. One vertical sheet handles both the habit `‚ãØ` (Rename / Switch kind / Delete) and the category `‚ãØ` (Rename / Delete). The menu items dispatch the existing handlers ‚Äî no business-logic changes.
-- **Sprint card: dropped the duplicate "14 days ¬∑ planning" line.** The dates already imply the count and the planning hint card already says "planning". Saves ~22 px.
-- **"+ Category" toolbar card removed.** Was a whole card just to hold a label and one button (~70 px). Now lives at the end of the category list as a subtle full-width button ‚Äî present but unobtrusive when categories exist. In the empty state it's the CTA inside the empty-state card.
+- **Habit row collapsed to one line.** Was `[name] [?] [YES/NO] [?]` + `Points: [-][1][+]` (~100 px tall per habit, ~132 px of trailing buttons). Now `[name] [stepper] [?]` on a single row ó count habits add a small "=N" stepper on a second line. Per-habit height ~52 px. **For a sprint with 9 habits, that's ~430 px of vertical space recovered.** Drops the "Points:" / "Limit:" labels (steppers carry the unit in the value: `+1`, `+0.5/u`, `=4`).
+- **Category card header trimmed.** Was `[CATEGORY] [Name] [+ Habit] [Remove]` (~88 px header per category). Now `[CATEGORY] [count badge] [+ Habit] [?]` ó Rename and Remove move into the `?` menu (rare actions, freed up width). The small count badge gives instant visibility into how many habits live there.
+- **Generic action-menu modal** replaces the inline per-row triplet of icon buttons. One vertical sheet handles both the habit `?` (Rename / Switch kind / Delete) and the category `?` (Rename / Delete). The menu items dispatch the existing handlers ó no business-logic changes.
+- **Sprint card: dropped the duplicate "14 days ∑ planning" line.** The dates already imply the count and the planning hint card already says "planning". Saves ~22 px.
+- **"+ Category" toolbar card removed.** Was a whole card just to hold a label and one button (~70 px). Now lives at the end of the category list as a subtle full-width button ó present but unobtrusive when categories exist. In the empty state it's the CTA inside the empty-state card.
 - **"Plan" tiny caption at the top removed.** The bottom-tab label already says PLAN. ~22 px reclaimed.
-- **Single-line planning hint** ("üìã Planning ‚Äî start date locks on your first entry.") and **single-line warning** ("‚ö† Editing past day 1 may change today's tallied score. Use Next instead."). Verbose three-line prose belongs in docs, not in the user's daily viewport ‚Äî ~40 px each.
+- **Single-line planning hint** ("?? Planning ó start date locks on your first entry.") and **single-line warning** ("? Editing past day 1 may change today's tallied score. Use Next instead."). Verbose three-line prose belongs in docs, not in the user's daily viewport ó ~40 px each.
 
 ### Total vertical space recovered
 
-For a typical view (current sprint, 3 categories √ó 3 habits, planning state):
+For a typical view (current sprint, 3 categories ◊ 3 habits, planning state):
 
 | Item | Before | After | Saved |
 |---|---:|---:|---:|
@@ -127,8 +131,8 @@ For a typical view (current sprint, 3 categories √ó 3 habits, planning state):
 | Planning hint | 80 | 36 | 44 |
 | Sprint length line | 22 | 0 | 22 |
 | `+ Category` toolbar | 70 | 0 | 70 |
-| 3 √ó category headers | 264 | 132 | 132 |
-| 9 √ó habit rows | 900 | 470 | 430 |
+| 3 ◊ category headers | 264 | 132 | 132 |
+| 9 ◊ habit rows | 900 | 470 | 430 |
 | **Total** | **~1358** | **~638** | **~720 px** |
 
 A 14-inch desktop scroll became a phone-screen glance.
@@ -136,20 +140,20 @@ A 14-inch desktop scroll became a phone-screen glance.
 ### Code cleanup
 
 - Dropped now-dead CSS rules: `.plan-h`, `.plan-cat-toolbar*`, `.plan-btns*`, `.plan-habit-top`, `.plan-kind`, `.plan-scores`, `.plan-score-group*`, `.plan-goal-headline*` (had cleaned the markup but rule was lingering).
-- Dropped the `habitKindLabel()` function (no longer rendered anywhere ‚Äî the kind toggle was inline; switch-kind now lives in the `‚ãØ` menu).
-- `state.actionMenu` shape mirrors `state.textModal` for symmetry ‚Äî both modals close on backdrop click + Cancel button + render in `core.js` `render()` alongside the existing add-habit modal.
+- Dropped the `habitKindLabel()` function (no longer rendered anywhere ó the kind toggle was inline; switch-kind now lives in the `?` menu).
+- `state.actionMenu` shape mirrors `state.textModal` for symmetry ó both modals close on backdrop click + Cancel button + render in `core.js` `render()` alongside the existing add-habit modal.
 
 ## [0.10.1] - 2026-05-19
 
-Plan-tab re-evaluation + testing infrastructure. No infra changes ‚Äî pure
+Plan-tab re-evaluation + testing infrastructure. No infra changes ó pure
 front-end + lambda-side refactor for testability.
 
 ### UX (Plan tab)
 
-- **Sprint card restructured into labeled sections.** Top-of-card caption (CURRENT SPRINT / UPCOMING SPRINT) then a meta block (name + description), then a **SCHEDULE** section (dates + length), then the existing **SCORING** section (goal + step). Each new section gets a thin border-top + a small mono caption ‚Äî reads as three logical clusters instead of one tall stack of inputs.
+- **Sprint card restructured into labeled sections.** Top-of-card caption (CURRENT SPRINT / UPCOMING SPRINT) then a meta block (name + description), then a **SCHEDULE** section (dates + length), then the existing **SCORING** section (goal + step). Each new section gets a thin border-top + a small mono caption ó reads as three logical clusters instead of one tall stack of inputs.
 - **Removed the duplicate goal/day headline.** The big "10 goal/day" number that appeared above the date row was a redundant display of the same value the Goal stepper already shows. The stepper is the editable surface; the headline was just visual noise.
 - **Empty-state card** when the focused sprint has no categories. Replaces the previously-empty gap below the "+ Category" toolbar. Includes example category names for first-time users.
-- **Habit kind labels: `Y/N` ‚Üí `YES/NO`, `CNT` ‚Üí `COUNT`.** The 3-character codes were opaque on first encounter; the longer labels are still short enough to fit in the button row.
+- **Habit kind labels: `Y/N` ? `YES/NO`, `CNT` ? `COUNT`.** The 3-character codes were opaque on first encounter; the longer labels are still short enough to fit in the button row.
 
 ### Text-input modal (replaces `window.prompt` for 3 sites)
 
@@ -160,13 +164,13 @@ front-end + lambda-side refactor for testability.
 
 ### Testing
 
-- **Extracted pure helpers** from `infrastructure/lambdas/sync/sprints.js` into a new `sprint-helpers.js` module. `findCovering`, `safeLengthDays`, `safeGoalPoints`, `safePointStep`, `sprintItemToObject`, `sprintObjectToItem` all live there now and import only from `constants.js` + `utils.js` (no `@aws-sdk/*` chain) ‚Äî so they're importable from the root `tests/` without requiring the SDK at the test runner's resolution scope. `sprints.js` re-exports them so all existing callers (`entries.js`, `summaries.js`) work unchanged.
-- **`tests/lambda-utils.test.js`** ‚Äî 34 new tests covering `addDays` (positive/negative/boundaries), `daysBetweenInclusive`, `clampToToday`, `quantize` (float drift, type coercion), `clampText`, `safeJsonParseObject` (incl. non-object inputs), `isValidDateKey`, `isValidSprintId`, `parseSprintIdParam`, `todayKey`.
-- **`tests/lambda-sprint-helpers.test.js`** ‚Äî 29 new tests covering the three `safe*` validators (edge cases, type coercion, range clamping), `sprintObjectToItem` ‚Üî `sprintItemToObject` round-trips for both started and planning sprints, and `findCovering` (no sprints, started-only, planning fallback, multiple planning, sparse arrays).
+- **Extracted pure helpers** from `infrastructure/lambdas/sync/sprints.js` into a new `sprint-helpers.js` module. `findCovering`, `safeLengthDays`, `safeGoalPoints`, `safePointStep`, `sprintItemToObject`, `sprintObjectToItem` all live there now and import only from `constants.js` + `utils.js` (no `@aws-sdk/*` chain) ó so they're importable from the root `tests/` without requiring the SDK at the test runner's resolution scope. `sprints.js` re-exports them so all existing callers (`entries.js`, `summaries.js`) work unchanged.
+- **`tests/lambda-utils.test.js`** ó 34 new tests covering `addDays` (positive/negative/boundaries), `daysBetweenInclusive`, `clampToToday`, `quantize` (float drift, type coercion), `clampText`, `safeJsonParseObject` (incl. non-object inputs), `isValidDateKey`, `isValidSprintId`, `parseSprintIdParam`, `todayKey`.
+- **`tests/lambda-sprint-helpers.test.js`** ó 29 new tests covering the three `safe*` validators (edge cases, type coercion, range clamping), `sprintObjectToItem` ? `sprintItemToObject` round-trips for both started and planning sprints, and `findCovering` (no sprints, started-only, planning fallback, multiple planning, sparse arrays).
 - **Tests caught real code looseness in three helpers:**
   - `safeLengthDays(null)` was returning `1` (because `Number(null) === 0` is finite and clamps to 1) instead of falling back to the default. Added explicit `null`/`undefined`/`''` guard at the top.
-  - `safeGoalPoints(null)` had the same bug ‚Äî returning `0` instead of `10`. Same guard.
-  - `safeJsonParseObject('[]')` was returning `[]` because `typeof [] === 'object'`. Tightened to also reject arrays ‚Äî callers always expect a plain object and would have surfaced `body.categories === undefined` otherwise.
+  - `safeGoalPoints(null)` had the same bug ó returning `0` instead of `10`. Same guard.
+  - `safeJsonParseObject('[]')` was returning `[]` because `typeof [] === 'object'`. Tightened to also reject arrays ó callers always expect a plain object and would have surfaced `body.categories === undefined` otherwise.
 - **101 tests pass** (was 38).
 
 ### Code cleanup
@@ -179,35 +183,35 @@ front-end + lambda-side refactor for testability.
 ## [0.10] - 2026-05-19
 
 UX polish + UI rename pass driven by walking each tab on a phone. **No API
-or data-model changes ‚Äî UI-only renames keep the internal `trends*` naming
+or data-model changes ó UI-only renames keep the internal `trends*` naming
 intact for state, file paths, and the `/api/trend/*` route family.**
 
 ### Renamed (UI labels only)
 
-- **Tab `TRENDS` ‚Üí `BURNDOWN`.** Reflects the centerpiece ‚Äî the Agile burndown chart is what the tab is for. Internal `state.tab === 'trends'` and `data-tab="trends"` unchanged.
-- **Mode buttons `SPRINT OVERVIEW` ‚Üí `THIS SPRINT`** and **`ALL-TIME` ‚Üí `ALL SPRINTS`.** Less jargon, clearer scope of what each view covers.
-- **All-Time header card title `ALL-TIME` ‚Üí `ALL SPRINTS`** (matches the new mode-button label).
+- **Tab `TRENDS` ? `BURNDOWN`.** Reflects the centerpiece ó the Agile burndown chart is what the tab is for. Internal `state.tab === 'trends'` and `data-tab="trends"` unchanged.
+- **Mode buttons `SPRINT OVERVIEW` ? `THIS SPRINT`** and **`ALL-TIME` ? `ALL SPRINTS`.** Less jargon, clearer scope of what each view covers.
+- **All-Time header card title `ALL-TIME` ? `ALL SPRINTS`** (matches the new mode-button label).
 
 ### UX
 
-- **Entry header redesigned.** Sprint name promoted to a prominent line (16 px / 700 weight, truncates with ellipsis) paired with an inline `DAY k / N` chip ‚Äî or `PLANNING` chip on a planning sprint. Day-in-sprint is computed for the *viewed* date, not just current, so navigating to past days shows the correct day-of-sprint. Day-nav row tightened ‚Äî arrows are 44√ó44 with `flex-shrink: 0`, date line centers between them with ellipsis on overflow.
-- **Boolean habit toggle: filled background when on.** Uses the category accent at 18 % alpha (via `color-mix`) for the on-state background and border, plus the label goes 600-weight. Off vs on is now distinguishable from across the room ‚Äî not just from the `‚óè` vs `‚óã` glyph and color shift.
+- **Entry header redesigned.** Sprint name promoted to a prominent line (16 px / 700 weight, truncates with ellipsis) paired with an inline `DAY k / N` chip ó or `PLANNING` chip on a planning sprint. Day-in-sprint is computed for the *viewed* date, not just current, so navigating to past days shows the correct day-of-sprint. Day-nav row tightened ó arrows are 44◊44 with `flex-shrink: 0`, date line centers between them with ellipsis on overflow.
+- **Boolean habit toggle: filled background when on.** Uses the category accent at 18 % alpha (via `color-mix`) for the on-state background and border, plus the label goes 600-weight. Off vs on is now distinguishable from across the room ó not just from the `?` vs `?` glyph and color shift.
 - **Global header bar stacks on narrow phones.** Below 420 px viewport width, the title moves to its own line and the status + sync pill drop below it. iPhone SE no longer cramps the "Good Habit Tracker" + "DAY 1/14" + status combo.
-- **Plan tab: Goal stepper + point-step selector visually grouped as `SCORING`.** Border-top, small caption, indented rows ‚Äî reads as one settings cluster instead of two adjacent button rows that look identical.
+- **Plan tab: Goal stepper + point-step selector visually grouped as `SCORING`.** Border-top, small caption, indented rows ó reads as one settings cluster instead of two adjacent button rows that look identical.
 - **Burndown chart: x-axis tick labels.** Three monospace tick labels at chart bottom (`d1` / `d{mid}` / `d{N}`) orient the timeline on narrow phones. Chart height bumped from 120 to 130 px to fit the label row without crowding the data.
-- **Pace metric prefixed with `‚Üë` / `‚Üì` / `¬∑` glyph.** Reinforces the color-coded sign for users who can't easily distinguish accent (gold, ahead) from danger (terracotta, behind) at a glance.
-- **Boot screen and `SYNCING‚Ä¶` / `SYNC FAILED` pills** moved off inline styles into named CSS classes (`.boot-card`, `.boot-headline`, `.app-sync-pill`, `.app-sync-error`) ‚Äî semantic markup, plus less DOM-string noise.
+- **Pace metric prefixed with `?` / `?` / `∑` glyph.** Reinforces the color-coded sign for users who can't easily distinguish accent (gold, ahead) from danger (terracotta, behind) at a glance.
+- **Boot screen and `SYNCINGÖ` / `SYNC FAILED` pills** moved off inline styles into named CSS classes (`.boot-card`, `.boot-headline`, `.app-sync-pill`, `.app-sync-error`) ó semantic markup, plus less DOM-string noise.
 
 ### Code cleanup
 
-- **Repeated inline `style="..."` patterns moved to CSS classes** wherever I touched a file ‚Äî new class families: `.app-header*`, `.boot-*`, `.entry-*`, `.plan-scoring*`, `.plan-goal-headline*`, `.plan-length-line`, `.trends-mode-switch`, `.trends-alltime-*`. Render templates are noticeably easier to read; visual tweaks now happen in CSS rather than scattered across `${...}` interpolations.
+- **Repeated inline `style="..."` patterns moved to CSS classes** wherever I touched a file ó new class families: `.app-header*`, `.boot-*`, `.entry-*`, `.plan-scoring*`, `.plan-goal-headline*`, `.plan-length-line`, `.trends-mode-switch`, `.trends-alltime-*`. Render templates are noticeably easier to read; visual tweaks now happen in CSS rather than scattered across `${...}` interpolations.
 - **Dead CSS rules removed.** `.title` (replaced by `.app-title`) and `.plan-sprint-dates` (removed from JS several releases ago).
-- **`dayInSprint(sprint, dateKey)` helper** in `entry-ui.js`. Replaces an ad-hoc `sprintInfo()` reach-through for "what day of the sprint is this viewed date?" ‚Äî the entry-header day chip needs per-viewed-day computation, not "current sprint, today" semantics.
-- **All buttons that lack visible text labels** (counter `‚àí`/`+`, score-edit `‚àí`/`+`, point-step buttons) gained descriptive `aria-label`s.
+- **`dayInSprint(sprint, dateKey)` helper** in `entry-ui.js`. Replaces an ad-hoc `sprintInfo()` reach-through for "what day of the sprint is this viewed date?" ó the entry-header day chip needs per-viewed-day computation, not "current sprint, today" semantics.
+- **All buttons that lack visible text labels** (counter `-`/`+`, score-edit `-`/`+`, point-step buttons) gained descriptive `aria-label`s.
 
 ### Docs
 
-- `CLAUDE.md` and `README.md` updated for the rename. CLAUDE.md notes explicitly that internal `trendsMode` / `trendsSprintId` / `trends-ui.js` / `/api/trend/*` stay as-is ‚Äî only user-visible strings changed.
+- `CLAUDE.md` and `README.md` updated for the rename. CLAUDE.md notes explicitly that internal `trendsMode` / `trendsSprintId` / `trends-ui.js` / `/api/trend/*` stay as-is ó only user-visible strings changed.
 
 ## [0.9] - 2026-05-19
 
@@ -220,67 +224,67 @@ and `ddb-meta-20260519-122914.json` are the immediately-pre-wipe snapshots).
 ### Security
 
 - **CloudFront `ResponseHeadersPolicy` on the default behavior.** Adds `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload`, a tight `Content-Security-Policy` (`default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`), `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`. The `/api/*` behavior uses the lighter AWS-managed `SECURITY_HEADERS` policy.
-- **CloudFront API origin: `QueryStringBehavior.none()`** (was `.all()`). No `/api/*` route reads query strings, so dropping them shrinks attack surface ‚Äî an `unlock=` param can't accidentally reach the API origin if edge auth is ever bypassed.
+- **CloudFront API origin: `QueryStringBehavior.none()`** (was `.all()`). No `/api/*` route reads query strings, so dropping them shrinks attack surface ó an `unlock=` param can't accidentally reach the API origin if edge auth is ever bypassed.
 - **64 KiB request-body cap** in `getBody`. Returns 413 before any handler sees an oversized payload; previously the 6 MB Function URL ceiling was the only limit.
 - **Generic 500 error responses.** The catch-all in `index.js` no longer echoes SDK error messages (which could leak table names / ARNs / AWS error codes). Errors are `console.error`-logged server-side; the response body is `{ "error": "internal" }`.
 - **Server-side validation of sprint numeric fields.** New `safeLengthDays`, `safeGoalPoints`, `safePointStep` helpers in `sprints.js` clamp/validate `lengthDays` (1..365 integer), `goalPoints` (0..10000 finite), and `pointStep` (must be one of `[0.1, 0.25, 0.5, 1]`). Defends against `NaN`/non-numeric values from a buggy or hostile client.
-- **`Array.isArray` checks on `body.categories` and `body.habitDefinitions`** in both POST and PUT handlers ‚Äî previously `body.categories || []` would have happily accepted a non-array value.
+- **`Array.isArray` checks on `body.categories` and `body.habitDefinitions`** in both POST and PUT handlers ó previously `body.categories || []` would have happily accepted a non-array value.
 - **`escapeHtml(id)` on every `data-id` attribute** in `plan-ui.js` and `entry-ui.js`. IDs come from `uid()` today so this is hygiene, but the layered defense protects against a future direct-API write of a crafted id.
 
 ### Deferred to v0.10 (Lambda@Edge auth hardening)
 
-The security engineer's findings on the auth Lambda ‚Äî **timing-safe cookie
+The security engineer's findings on the auth Lambda ó **timing-safe cookie
 compare** (`crypto.timingSafeEqual`), **`htok` Max-Age dropped to 30 days**,
 **`safeRedirectPath` open-redirect guard**, **`nosniff`/`X-Frame-Options`/
-`Referrer-Policy` on the 403 response** ‚Äî were implemented but **reverted before
+`Referrer-Policy` on the 403 response** ó were implemented but **reverted before
 shipping** because any change to the Lambda@Edge code triggers the CDK
 cross-region SSM export deadlock (`ExportsWriteruswest209BD44F0A7CF058B` rejects
 the update because the main stack still imports the old version ARN). Shipping
 them safely requires either the documented 3-step `temp_drop_edge_auth` deploy
 (removed in v0.7 because the user disliked the auth gap) OR a re-architecture
-of the cross-region reference. Tracking as v0.10 work ‚Äî the CloudFront default
+of the cross-region reference. Tracking as v0.10 work ó the CloudFront default
 HSTS+CSP headers already cover the most important client-side guarantees.
 
 ### Cost / observability
 
-- **`logRetention: ONE_MONTH` on the sync Lambda** (was infinite ‚Äî CloudWatch storage was accruing forever).
-- **`memorySize: 256` on the sync Lambda** (was the 128 MB default). CPU scales linearly with memory; ~halves p99 latency for ~1.5√ó the per-ms cost, net cheaper on this workload because requests finish sooner. The auth Lambda@Edge stays at 128 MB ‚Äî the function is too trivial to benefit.
+- **`logRetention: ONE_MONTH` on the sync Lambda** (was infinite ó CloudWatch storage was accruing forever).
+- **`memorySize: 256` on the sync Lambda** (was the 128 MB default). CPU scales linearly with memory; ~halves p99 latency for ~1.5◊ the per-ms cost, net cheaper on this workload because requests finish sooner. The auth Lambda@Edge stays at 128 MB ó the function is too trivial to benefit.
 
 ### DR / ops
 
 - **DynamoDB point-in-time recovery enabled** on both `CyclesTable` and `CheckinsTable`. ~$0.20/GB-month at this scale (pennies). Protects against bad client writes / orphan-sweep regressions that `RemovalPolicy.RETAIN` does not.
 - **S3 versioning enabled** on `AppBucket` with a 30-day noncurrent-version expiration. Undoes accidental `BucketDeployment` overwrites; storage cost is negligible.
-- **`scripts/backup.ps1` and `scripts/backup.sh` rewritten** against the current per-item REST API. Previous versions hit removed `/api/cycles` and `/api/entries` endpoints ‚Äî every run had been failing silently since the v0.5 refactor. New scripts walk `/api/trend/sprint-summary`, fetch each `/api/sprint/:id`, then enumerate every covered date calling `/api/entry/:dateKey`. Output: timestamped JSON with `{ sprints, entries }`.
+- **`scripts/backup.ps1` and `scripts/backup.sh` rewritten** against the current per-item REST API. Previous versions hit removed `/api/cycles` and `/api/entries` endpoints ó every run had been failing silently since the v0.5 refactor. New scripts walk `/api/trend/sprint-summary`, fetch each `/api/sprint/:id`, then enumerate every covered date calling `/api/entry/:dateKey`. Output: timestamped JSON with `{ sprints, entries }`.
 
 ### UX / accessibility
 
-- **Touch targets ‚â• 44√ó44 px** (Apple HIG + WCAG 2.5.5). `.btn` and `.tab` now have `min-height: 44px` and `padding: 10px 14px`; counter columns widened from 36 px to 48 px. Significantly reduces mis-taps on the most-used Entry-tab interactions.
+- **Touch targets = 44◊44 px** (Apple HIG + WCAG 2.5.5). `.btn` and `.tab` now have `min-height: 44px` and `padding: 10px 14px`; counter columns widened from 36 px to 48 px. Significantly reduces mis-taps on the most-used Entry-tab interactions.
 - **Bottom-tabs visual separation.** Stronger border-top, backdrop blur (8 px) where supported, and a subtle drop shadow. The toolbar now reads as a fixed shelf rather than fading into the list.
 - **`PLANNING` hint card on the Plan tab** when the current sprint hasn't started yet. iOS has no hover, so the existing `title=` tooltip on the disabled start-date input was invisible. The hint explains what's happening and where to go to start.
-- **`--muted` contrast bumped from `#7a7a85` to `#9a9aa5`.** Old value was 4.4:1 on the dark theme ‚Äî just barely WCAG AA and uncomfortable at 10‚Äì12 px small-text. ~6.4:1 now.
+- **`--muted` contrast bumped from `#7a7a85` to `#9a9aa5`.** Old value was 4.4:1 on the dark theme ó just barely WCAG AA and uncomfortable at 10ñ12 px small-text. ~6.4:1 now.
 - **`:focus-visible` outline on `.btn` and `.tab`.** Keyboard users can now see where they are; previously only `.plan-input` had a focus style.
 - **`aria-label="Main"` + `role="tab"` + `aria-selected` on the bottom tabs.** Screen readers can now announce which tab is current.
 - **`aria-pressed` + descriptive `aria-label` on boolean habit toggles.** Plus `aria-live="polite"` on the count display so increments are announced.
-- **`aria-label` on counter +/‚àí buttons** including the habit name.
+- **`aria-label` on counter +/- buttons** including the habit name.
 - **`<label>` wrapping the retrospective textarea** so the caption and input are properly associated.
 
 ## [0.8] - 2026-05-19
 
 ### Added
 
-- **"Planning" sprint state.** A sprint created when no other sprint exists (typically the very first one, also any first-sprint-after-a-gap-day via `ensureCurrentSprint`) is born with `startDate = null` and `endDate = null`. The Plan tab renders its start input as today's date (disabled), its end input as `today + lengthDays ‚àí 1` (editable ‚Äî adjusts duration), and tags the day-count line with `¬∑ planning`. The lambda's `findCovering` falls back to the lowest-ID planning sprint when no started sprint covers the queried date, so the Entry tab and entry GETs work seamlessly while planning.
-- **First-entry transitions the sprint.** When the lambda's `handlePutEntry` stamps the first entry against a planning sprint, it sets `startDate = entry.dateKey`, `endDate = startDate + lengthDays ‚àí 1`, and returns the new dates in `{ sprintStarted: { sprintId, startDate, endDate } }`. The client patches local state on receipt so the UI flips from "PLANNING" to "DAY 1 / N" without a full reload.
-- **Date pickers are locked after start.** Both start and end inputs on the Plan tab are `disabled` once a sprint has a real `startDate`. This trades the escape-hatch for cleaner semantics ‚Äî sprint dates are immutable once you've actually started doing the work. (`lengthDays` is implicitly locked too, since the buttons that adjusted it were removed in this release.)
+- **"Planning" sprint state.** A sprint created when no other sprint exists (typically the very first one, also any first-sprint-after-a-gap-day via `ensureCurrentSprint`) is born with `startDate = null` and `endDate = null`. The Plan tab renders its start input as today's date (disabled), its end input as `today + lengthDays - 1` (editable ó adjusts duration), and tags the day-count line with `∑ planning`. The lambda's `findCovering` falls back to the lowest-ID planning sprint when no started sprint covers the queried date, so the Entry tab and entry GETs work seamlessly while planning.
+- **First-entry transitions the sprint.** When the lambda's `handlePutEntry` stamps the first entry against a planning sprint, it sets `startDate = entry.dateKey`, `endDate = startDate + lengthDays - 1`, and returns the new dates in `{ sprintStarted: { sprintId, startDate, endDate } }`. The client patches local state on receipt so the UI flips from "PLANNING" to "DAY 1 / N" without a full reload.
+- **Date pickers are locked after start.** Both start and end inputs on the Plan tab are `disabled` once a sprint has a real `startDate`. This trades the escape-hatch for cleaner semantics ó sprint dates are immutable once you've actually started doing the work. (`lengthDays` is implicitly locked too, since the buttons that adjusted it were removed in this release.)
 - **`isSprintInPlanning(sprint)` helper** in `scoring.js`, re-exported via `core.js`. Used by Plan UI, Trends UI, and the date-change handler.
 
 ### Removed
 
-- **`¬±14d` length stepper buttons on the Plan tab.** Redundant with the start/end date pickers ‚Äî adjust via dates. Length still displays below the date row.
+- **`±14d` length stepper buttons on the Plan tab.** Redundant with the start/end date pickers ó adjust via dates. Length still displays below the date row.
 
 ### Changed
 
-- **New sprints always default to 14 days** regardless of the prior sprint's length. `pointStep` and `goalPoints` still inherit (they're scoring settings the user has tuned), but length doesn't ‚Äî the date pickers are the right surface for adjusting a specific sprint's window. Affects both first-sprint creation (`ensureCurrentSprint`) and next-sprint creation (Plan tab ‚Üí Next).
-- **Trends Sprint Overview gracefully handles planning sprints.** Header shows "Not started yet ¬∑ N days planned" instead of `null ‚Üí null`. Metrics and the burndown chart are replaced by a single message pointing to the Entries tab. Retrospective stays hidden (lambda + UI both gate on `canEditRetrospective`, which is false for planning sprints).
+- **New sprints always default to 14 days** regardless of the prior sprint's length. `pointStep` and `goalPoints` still inherit (they're scoring settings the user has tuned), but length doesn't ó the date pickers are the right surface for adjusting a specific sprint's window. Affects both first-sprint creation (`ensureCurrentSprint`) and next-sprint creation (Plan tab ? Next).
+- **Trends Sprint Overview gracefully handles planning sprints.** Header shows "Not started yet ∑ N days planned" instead of `null ? null`. Metrics and the burndown chart are replaced by a single message pointing to the Entries tab. Retrospective stays hidden (lambda + UI both gate on `canEditRetrospective`, which is false for planning sprints).
 - **Header bar reads `PLANNING`** instead of `DAY N/M` when the current sprint hasn't started yet.
 - **iOS auto-zoom fix.** Sprint name/description inputs, date pickers, and the retrospective textarea bumped to `font-size: 16px`. Safari only auto-zooms on focus when the input font-size is below 16, so this disables the unwanted zoom without touching viewport `user-scalable` (which would block accessibility pinch-zoom).
 
@@ -288,18 +292,18 @@ HSTS+CSP headers already cover the most important client-side guarantees.
 
 ### Added
 
-- **Burndown chart in Trends ‚Üí Sprint Overview.** Replaces the daily-points line chart with an Agile-style burndown: a dashed ideal line from `(day 0, totalGoal)` to `(day N, 0)`, and a solid actual line that tracks `totalGoal ‚àí cumulative earned` per day. Sitting below the ideal means you're ahead of pace.
-- **PACE metric** alongside POINTS in Sprint Overview. Shows `¬±N` (color-coded ‚Äî ahead in accent, behind in danger, on-pace in muted) plus `day X / Y` for at-a-glance progress.
-- **Sprint date pickers in Plan tab.** Native `<input type="date">` for both start and end. End date clamps to start; length recalculates on commit; `change` event re-renders (vs the `input` no-render path used for free-text fields). Future-proofs date editing beyond the ¬±N stepper. Pickers stack to a single column below 480 px so iPhone widths don't overflow.
+- **Burndown chart in Trends ? Sprint Overview.** Replaces the daily-points line chart with an Agile-style burndown: a dashed ideal line from `(day 0, totalGoal)` to `(day N, 0)`, and a solid actual line that tracks `totalGoal - cumulative earned` per day. Sitting below the ideal means you're ahead of pace.
+- **PACE metric** alongside POINTS in Sprint Overview. Shows `±N` (color-coded ó ahead in accent, behind in danger, on-pace in muted) plus `day X / Y` for at-a-glance progress.
+- **Sprint date pickers in Plan tab.** Native `<input type="date">` for both start and end. End date clamps to start; length recalculates on commit; `change` event re-renders (vs the `input` no-render path used for free-text fields). Future-proofs date editing beyond the ±N stepper. Pickers stack to a single column below 480 px so iPhone widths don't overflow.
 - **`LIVE` alias on the Lambda@Edge auth function.** Stable handle for monitoring and manual invocation. CloudFront still references the version ARN (Lambda@Edge rejects alias ARNs).
-- **`.claude/settings.json` + `PreToolUse` hook (`block-local-deploy.js`)** that block local `cdk deploy`, `deploy.ps1`, and `deploy.sh` invocation ‚Äî including substring-matched wrapped variants like `Push-Location infrastructure; npx cdk deploy ...`. Forces deploys through GitHub Actions.
+- **`.claude/settings.json` + `PreToolUse` hook (`block-local-deploy.js`)** that block local `cdk deploy`, `deploy.ps1`, and `deploy.sh` invocation ó including substring-matched wrapped variants like `Push-Location infrastructure; npx cdk deploy ...`. Forces deploys through GitHub Actions.
 
 ### Changed
 
 - **Trends Sprint Overview header.** Sprint name (or `Sprint N` fallback) now sits inline between the prev/next arrows instead of a separate row below the muted `SPRINT N` caption. Cleaner, less vertical space, no duplicate identifier.
 - **Empty description/retrospective hide entirely** instead of showing italic "No description." placeholder text. Past + current sprints with no retro still show the editable input so the user can add one; upcoming sprints hide the retro block completely.
 - **POINTS metric reformats to `X / total`** (instead of `X` plus a separate "of total" subtext) with `N left` underneath. Less wrapping on narrow phones. PACE subtext font is smaller for the same reason.
-- **Length stepper is now ¬±14d** (was ¬±7d), aligning with the default sprint length. Minimum floor for the stepper is 1 day (date pickers can go anywhere).
+- **Length stepper is now ±14d** (was ±7d), aligning with the default sprint length. Minimum floor for the stepper is 1 day (date pickers can go anywhere).
 
 ### Removed
 
@@ -309,14 +313,14 @@ HSTS+CSP headers already cover the most important client-side guarantees.
 
 ### Added
 
-- **Sprint name + description + retrospective.** Every sprint now carries optional `name` (‚â§80 chars), `description` (‚â§2000), and `retrospective` (‚â§5000) fields. Name and description are edited in the Plan tab sprint card; retrospective is edited in the new Trends ‚Üí Sprint Overview view. Each is backward compatible ‚Äî existing sprints read as empty strings until edited.
-- **Sprint name in Entry header.** When a sprint has a name, it renders above the date line on the Entry tab ‚Äî gives daily context (e.g. "Hibernation Recovery") without taking real estate when unset.
+- **Sprint name + description + retrospective.** Every sprint now carries optional `name` (=80 chars), `description` (=2000), and `retrospective` (=5000) fields. Name and description are edited in the Plan tab sprint card; retrospective is edited in the new Trends ? Sprint Overview view. Each is backward compatible ó existing sprints read as empty strings until edited.
+- **Sprint name in Entry header.** When a sprint has a name, it renders above the date line on the Entry tab ó gives daily context (e.g. "Hibernation Recovery") without taking real estate when unset.
 - **`canEditRetrospective(sprint, todayKey)` + `clampSprintText(value, max)`** helpers in `app/scripts/scoring.js`. Pure, testable. Lambda mirrors via `clampText` in `utils.js`.
 - **Tests.** 12 new test cases covering `canEditRetrospective` (past / current / first-day / upcoming / null) and `clampSprintText` (trim, slice, coerce, empty).
 
 ### Changed
 
-- **Trends redesigned: two modes only.** `SPRINT OVERVIEW` (default) walks every sprint with prev/next ‚Äî name, description, daily-points chart with goal line, summary stats, and editable retrospective. `ALL-TIME` plots one point per sprint at avg pts/day across the user's whole history, with a per-sprint legend. The four-mode switcher (sprint / month / year / all) is gone.
+- **Trends redesigned: two modes only.** `SPRINT OVERVIEW` (default) walks every sprint with prev/next ó name, description, daily-points chart with goal line, summary stats, and editable retrospective. `ALL-TIME` plots one point per sprint at avg pts/day across the user's whole history, with a per-sprint legend. The four-mode switcher (sprint / month / year / all) is gone.
 - **Sprint summary row gains `name`.** Powers the All-Time chart's sprint labels without a per-sprint round trip. Invalidated when a sprint's name changes (`handlePutSprint` summary-invalidation gap caught in plan review and fixed).
 - **Text-edit focus preservation.** Sprint name/description/retrospective edits flow through a dedicated `input` event listener that updates state and debounces save **without re-rendering**. Going through the click pipeline would have rebuilt the DOM and dropped focus + cursor position on every keystroke.
 - **Retrospective gating (defense in depth).** UI disables the retro textarea on upcoming sprints; lambda also rejects retrospective edits with 400 when `body.startDate > today`.
@@ -333,12 +337,12 @@ HSTS+CSP headers already cover the most important client-side guarantees.
 ### Added
 
 - **`Goal` replaces `Max`** as the headline ceiling concept. New per-sprint `goalPoints` field (daily, default `10`); UI shows `pts / goal`; trends chart has a dashed goal reference line; the bounded "max possible" math is gone from the user-facing UI.
-- **Unlimited count habits.** Setting a count habit's daily limit to `0` makes it open-ended ‚Äî counter has no upper clamp; UI renders `n` (not `n / limit`); `Limit: ‚àû` in Plan.
-- **Renamed `Cycle` ‚Üí `Sprint`** throughout: API routes (`/api/sprint/*`, `/api/trend/sprint/*`, `/api/trend/sprint-summary`), DDB partition keys (`main#SPRINT_DEF`, `main#SPRINT_SUM`), the entry-row attribute (`sprintId`), UI labels, CSS class names, and every code symbol. The meta-row's `nextCycleId` becomes `nextSprintId`. Aligns terminology with the Agile sprint model.
-- **Tests.** Vitest setup at the repo root with parity tests for `pointsForEntry` (lambda ‚Üî front-end), `quantize`, `fmtPoints`, `fmtPointsForStep`, `decimalsForStep`, `pointStep`, `goalForSprint`. 24 tests passing.
+- **Unlimited count habits.** Setting a count habit's daily limit to `0` makes it open-ended ó counter has no upper clamp; UI renders `n` (not `n / limit`); `Limit: 8` in Plan.
+- **Renamed `Cycle` ? `Sprint`** throughout: API routes (`/api/sprint/*`, `/api/trend/sprint/*`, `/api/trend/sprint-summary`), DDB partition keys (`main#SPRINT_DEF`, `main#SPRINT_SUM`), the entry-row attribute (`sprintId`), UI labels, CSS class names, and every code symbol. The meta-row's `nextCycleId` becomes `nextSprintId`. Aligns terminology with the Agile sprint model.
+- **Tests.** Vitest setup at the repo root with parity tests for `pointsForEntry` (lambda ? front-end), `quantize`, `fmtPoints`, `fmtPointsForStep`, `decimalsForStep`, `pointStep`, `goalForSprint`. 24 tests passing.
 - **Linter + formatter.** Biome at the repo root: `npm run check`, `npm run check:fix`. Auto-formatted the entire codebase to a single consistent style.
 - **GitHub Actions CI.** `.github/workflows/ci.yml` runs Biome + Vitest + `cdk synth` on every PR. `.github/workflows/deploy.yml` runs the gate + `cdk deploy` on tag pushes (`X.Y` / `X.Y.Z`) and on manual dispatch.
-- **JSDoc types** for Sprint, Entry, Habit, Category, Summary, DayBucket in `app/scripts/types.js` ‚Äî IDE autocomplete on the shared shapes without adding TypeScript.
+- **JSDoc types** for Sprint, Entry, Habit, Category, Summary, DayBucket in `app/scripts/types.js` ó IDE autocomplete on the shared shapes without adding TypeScript.
 
 ### Changed
 
@@ -350,39 +354,39 @@ HSTS+CSP headers already cover the most important client-side guarantees.
 
 ### Removed
 
-- **All migration scaffolding** (the cycle‚Üísprint migration ran once on the first deploy, then was stripped in the next deploy). No legacy attribute fallbacks anywhere; no `ensureMigrated` plumbing.
-- **The "max points" concept** in the UI. The progress bar and trends charts now key off `goalPoints` instead of `totalMax`. `habitMax`, `categoryMax`, `totalMax` removed from core.js. The cycle-summary's `max` attribute is gone (re-deriveable from `goalPoints √ó days`).
+- **All migration scaffolding** (the cycle?sprint migration ran once on the first deploy, then was stripped in the next deploy). No legacy attribute fallbacks anywhere; no `ensureMigrated` plumbing.
+- **The "max points" concept** in the UI. The progress bar and trends charts now key off `goalPoints` instead of `totalMax`. `habitMax`, `categoryMax`, `totalMax` removed from core.js. The cycle-summary's `max` attribute is gone (re-deriveable from `goalPoints ◊ days`).
 
 ### Migration (one-shot, ran on first request after deploy; no longer in the code)
 
-- DDB partition `main#CYCLE_DEF` ‚Üí `main#SPRINT_DEF` (rows rewritten in place).
-- DDB partition `main#CYCLE_SUM` ‚Üí `main#SPRINT_SUM` (old summaries dropped, lazy-fill on next trends view).
-- Entry-row attribute `cycleId` ‚Üí `sprintId`.
-- Meta-row attribute `nextCycleId` ‚Üí `nextSprintId`.
+- DDB partition `main#CYCLE_DEF` ? `main#SPRINT_DEF` (rows rewritten in place).
+- DDB partition `main#CYCLE_SUM` ? `main#SPRINT_SUM` (old summaries dropped, lazy-fill on next trends view).
+- Entry-row attribute `cycleId` ? `sprintId`.
+- Meta-row attribute `nextCycleId` ? `nextSprintId`.
 
 ## [0.4] - 2026-05-05
 
 ### Added
 
-- **Configurable point granularity per cycle** (`cycle.pointStep`: `0.1`, `0.25`, `0.5`, or `1`). The +/- buttons in Plan use this step for `points` and `pointsPerUnit`; `maxUnits` stays integer. Switching the step snaps every existing habit value onto the new grid (e.g., 0.25 ‚Üí 0.5 turns 1.25 into 1.5). New cycles inherit `pointStep` from the cycle they're cloned from.
+- **Configurable point granularity per cycle** (`cycle.pointStep`: `0.1`, `0.25`, `0.5`, or `1`). The +/- buttons in Plan use this step for `points` and `pointsPerUnit`; `maxUnits` stays integer. Switching the step snaps every existing habit value onto the new grid (e.g., 0.25 ? 0.5 turns 1.25 into 1.5). New cycles inherit `pointStep` from the cycle they're cloned from.
 - **Step-aware display precision** throughout the app: `1/1` for step `1`, `1.0/1.0` for step `0.5` or `0.1`, `1.00/1.00` for step `0.25`. Each entry uses its own cycle's step, so old days render in their original precision.
-- **Plan-tab edit safety**: opening Plan past day 1 of the current cycle auto-selects **Next**. Toggling back to Current shows a red warning banner ‚Äî edits past day 1 can change scores already tallied.
+- **Plan-tab edit safety**: opening Plan past day 1 of the current cycle auto-selects **Next**. Toggling back to Current shows a red warning banner ó edits past day 1 can change scores already tallied.
 - **Count-habit clarity**: the counter row now shows `n / maxUnits` (units progress), separate from the points conversion in the header.
 - **Mode-specific trends endpoints** (one round-trip each):
-  - `GET /api/trend/cycle/:id` ‚Äî daily buckets within one cycle.
-  - `GET /api/trend/month/:yyyy-mm` ‚Äî daily buckets for a month.
-  - `GET /api/trend/cycle-summary` ‚Äî one aggregate per cycle (year + all-time views share this).
+  - `GET /api/trend/cycle/:id` ó daily buckets within one cycle.
+  - `GET /api/trend/month/:yyyy-mm` ó daily buckets for a month.
+  - `GET /api/trend/cycle-summary` ó one aggregate per cycle (year + all-time views share this).
 - **Cycle-summary storage** at `pk='main#CYCLE_SUM'`, lazy-filled on first read and invalidated on entry/cycle writes. All-time trends become O(1) DynamoDB Query after first view.
 - **`POST /api/cycle`** with server-assigned integer ids (atomic `nextCycleId` increment on the meta row). Front-end never picks an id.
-- **`userId`-prefixed partition keys** on every DynamoDB row (`main#DAY`, `main#CYCLE_DEF`, `main#CYCLE_SUM`). Multi-user is now a one-line change ‚Äî replace the `USER_ID` constant with a per-request lookup.
+- **`userId`-prefixed partition keys** on every DynamoDB row (`main#DAY`, `main#CYCLE_DEF`, `main#CYCLE_SUM`). Multi-user is now a one-line change ó replace the `USER_ID` constant with a per-request lookup.
 
 ### Changed
 
 - **Strict per-day entry loading.** Boot fetches only `GET /api/entry/:today` plus `GET /api/cycle/:id`. Day navigation loads exactly one entry. No more bulk-load on app start.
-- **Cycle ids are positive integers** (1, 2, 3, ‚Ä¶). Trends prev/next cycle is `id ¬± 1`. UUIDs from prior versions are migrated in place.
+- **Cycle ids are positive integers** (1, 2, 3, Ö). Trends prev/next cycle is `id ± 1`. UUIDs from prior versions are migrated in place.
 - **Cycles split into per-row items** (`pk='main#CYCLE_DEF'`, sk=`cycleId`) instead of one `cyclesJson` blob. PUT cycle is O(1) regardless of total cycle count and no longer bound by DynamoDB's 400 KB item limit.
 - **Entry rows carry `cycleId`**, stamped at write time. Entry GET is one round-trip; re-stamped on cycle PUT when the date range moves.
-- **Orphan-habit sweep is conditional** ‚Äî only runs when habit ids are genuinely orphaned (removed from this cycle and not present in any other). Bounded to the union of cycle ranges.
+- **Orphan-habit sweep is conditional** ó only runs when habit ids are genuinely orphaned (removed from this cycle and not present in any other). Bounded to the union of cycle ranges.
 - **Parallel cycle-summary fill** via `Promise.all` over missing cycles.
 - **Bounds bump consolidates to one round-trip** (initial `if_not_exists` + two parallel conditional extends) instead of three sequential UpdateItems.
 - **Trends UI driven by mode-specific data sources**: cycle/month modes plot daily buckets; year/all-time plot one point per cycle at its `startDate` (cycle averages).
@@ -393,14 +397,14 @@ HSTS+CSP headers already cover the most important client-side guarantees.
 - **Bulk endpoints**: `GET /api/cycles`, `GET /api/entries`.
 - **DELETE endpoints**: `DELETE /api/cycle/:id`, `DELETE /api/entry/:date`. PUT entry with empty `habitValuesById` deletes server-side; nothing in the UI deletes a cycle.
 - **`cyclesJson` blob** on the meta row. Cycles are now individual rows.
-- Date-range query parameters on entry endpoints ‚Äî strict per-item access only.
+- Date-range query parameters on entry endpoints ó strict per-item access only.
 
 ### Migration (idempotent, runs on first request after deploy)
 
-- Cycle UUIDs ‚Üí integer ids (sorted by `startDate`).
-- `cyclesJson` blob ‚Üí individual `CYCLE_DEF` rows.
-- Plain `pk='DAY'` entry rows ‚Üí `pk='main#DAY'` with `cycleId` stamped from the covering cycle.
-- Plain `pk='CYCLE'` summary rows ‚Üí `pk='main#CYCLE_SUM'`.
+- Cycle UUIDs ? integer ids (sorted by `startDate`).
+- `cyclesJson` blob ? individual `CYCLE_DEF` rows.
+- Plain `pk='DAY'` entry rows ? `pk='main#DAY'` with `cycleId` stamped from the covering cycle.
+- Plain `pk='CYCLE'` summary rows ? `pk='main#CYCLE_SUM'`.
 
 ## [0.3] - 2026-04-28
 
@@ -413,7 +417,7 @@ HSTS+CSP headers already cover the most important client-side guarantees.
 
 ### Changed
 
-- **Naming consistency throughout.** Renamed `today` UI references to `entry`/`entries` and `tune` references to `plan`. File renames `today-ui.js` ‚Üí `entry-ui.js`, `tune-ui.js` ‚Üí `plan-ui.js`. Function renames `renderToday` ‚Üí `renderEntry`, `renderTune` ‚Üí `renderPlan`. State renames `state.checkinsByDate` ‚Üí `state.entriesByDate`, `state.checkinBounds` ‚Üí `state.entryBounds`, `state.tuneMode` ‚Üí `state.planMode`. CSS classes `.tune-*` ‚Üí `.plan-*`. Wire field `checkinBounds` ‚Üí `entryBounds`. DynamoDB attributes `checkinDateMin/Max` ‚Üí `entryDateMin/Max` (existing data migrated in place). Tab label `TUNE` ‚Üí `PLAN`.
+- **Naming consistency throughout.** Renamed `today` UI references to `entry`/`entries` and `tune` references to `plan`. File renames `today-ui.js` ? `entry-ui.js`, `tune-ui.js` ? `plan-ui.js`. Function renames `renderToday` ? `renderEntry`, `renderTune` ? `renderPlan`. State renames `state.checkinsByDate` ? `state.entriesByDate`, `state.checkinBounds` ? `state.entryBounds`, `state.tuneMode` ? `state.planMode`. CSS classes `.tune-*` ? `.plan-*`. Wire field `checkinBounds` ? `entryBounds`. DynamoDB attributes `checkinDateMin/Max` ? `entryDateMin/Max` (existing data migrated in place). Tab label `TUNE` ? `PLAN`.
 - **Storage layout** is unchanged at the table level (same names, same partition keys); the lambda now exposes per-item endpoints over the existing rows. Bounds are maintained incrementally on every entry put/delete instead of by scanning the entire entries table on every write.
 - **Boot** is two parallel calls (`GET /api/cycles` + `GET /api/entries`) instead of a single 730-day range fetch.
 
