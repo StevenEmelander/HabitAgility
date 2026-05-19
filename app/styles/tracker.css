@@ -187,14 +187,15 @@ body {
 .plan-modal-kind-row .btn { flex: 1; font-size: 13px; padding: 7px 8px; }
 .plan-modal-alert-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
 
-.plan-input { width: 100%; padding: 9px 11px; border-radius: 6px; border: 1px solid var(--border); background: #0e0e12; color: var(--text); font-family: inherit; font-size: 14px; line-height: 1.4; resize: vertical; }
+/* font-size: 16px on text inputs prevents iOS Safari from auto-zooming on focus. */
+.plan-input { width: 100%; padding: 9px 11px; border-radius: 6px; border: 1px solid var(--border); background: #0e0e12; color: var(--text); font-family: inherit; font-size: 16px; line-height: 1.4; resize: vertical; }
 .plan-input:focus { outline: none; border-color: var(--accent); }
 .plan-sprint-name { font-size: 16px; font-weight: 600; }
 .plan-sprint-desc { min-height: 60px; }
 .plan-date-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .plan-date-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .plan-date-field .plan-lbl { font-size: 10px; letter-spacing: 0.08em; color: var(--muted); text-transform: uppercase; }
-.plan-date-input { width: 100%; box-sizing: border-box; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; padding: 8px 10px; color-scheme: dark; min-width: 0; }
+.plan-date-input { width: 100%; box-sizing: border-box; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 16px; padding: 8px 10px; color-scheme: dark; min-width: 0; }
 @media (max-width: 480px) { .plan-date-row { grid-template-columns: 1fr; } }
 
 .trends-sprint-nav { gap: 8px; align-items: center; margin-bottom: 6px; }
@@ -207,7 +208,7 @@ body {
 .trends-sprint-desc { font-size: 14px; line-height: 1.5; color: var(--text); white-space: pre-wrap; margin-top: 10px; }
 .trends-sprint-desc.empty { color: var(--muted); font-style: italic; }
 .trends-retro-label { font-size: 11px; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 6px; }
-.trends-retro-input { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: #0e0e12; color: var(--text); font-family: inherit; font-size: 14px; line-height: 1.5; min-height: 90px; resize: vertical; }
+.trends-retro-input { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: #0e0e12; color: var(--text); font-family: inherit; font-size: 16px; line-height: 1.5; min-height: 90px; resize: vertical; }
 .trends-retro-input:focus { outline: none; border-color: var(--accent); }
 .trends-retro-input:disabled { opacity: 0.5; cursor: not-allowed; }
 .entry-sprint-name { font-size: 15px; font-weight: 600; line-height: 1.2; margin-bottom: 4px; }
