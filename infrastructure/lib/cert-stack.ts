@@ -47,6 +47,19 @@ export class CertStack extends cdk.Stack {
       handler: 'index.handler',
       code: lambda.Code.fromAsset(authSrcDir),
     });
+
+    // CloudFront Lambda@Edge requires a specific version ARN (not an alias).
+    // The version ARN changes when the token rotates, which updates the cross-region
+    // SSM export written by ExportsWriteruswest2. This is safe as long as the deploy
+    // succeeds end-to-end; a failed deploy's rollback can leave the SSM update
+    // in an ambiguous state (use `cdk deploy --all` to recover).
     this.authFnVersion = authFn.currentVersion;
+
+    // LIVE alias — stable ARN regardless of version, useful for CloudWatch alarms
+    // and manual invocation. CloudFront must still reference the version ARN above.
+    new lambda.Alias(this, 'AuthFnLive', {
+      aliasName: 'LIVE',
+      version: authFn.currentVersion,
+    });
   }
 }

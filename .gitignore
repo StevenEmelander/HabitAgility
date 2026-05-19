@@ -9,3 +9,5 @@ infrastructure/cdk.out/
 infrastructure/cdk.context.json
 .cdk-gen/
 *.js.map
+.deploy-iam-policy.json
+.release-notes-*.md

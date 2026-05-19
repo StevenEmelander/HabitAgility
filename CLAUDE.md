@@ -88,9 +88,17 @@ Or `deploy.ps1` on Windows. Scripts echo the bookmarkable unlock URL; they do no
 
 **Backups:** `scripts/backup.ps1` (or `backup.sh`) reads `UNLOCK_TOKEN` from env, computes the `htok` cookie hash, dumps every sprint + entry via the per-item REST API, and writes a single timestamped JSON file to `backups/`. Run before any risky deploy or schema change.
 
-### Lambda@Edge auth updates (export deadlock)
+### Lambda@Edge auth and token rotation
 
-If changing the Edge auth Lambda while the main stack imports the cert stack’s export, deploy **in order** with `--exclusively`: (1) `GoodHabitTracker` with `--context temp_drop_edge_auth=true` (briefly ungated), (2) `GoodHabitTrackerCert`, (3) `GoodHabitTracker` again without `temp_drop_edge_auth`. `cert-stack.ts` replaces only the line `const UNLOCK_HASH = '__UNLOCK_HASH__';` in `lambdas/auth/index.js` — keep that placeholder out of comments.
+`cert-stack.ts` replaces only the line `const UNLOCK_HASH = ‘__UNLOCK_HASH__’;` in `lambdas/auth/index.js` — keep that placeholder out of comments.
+
+The cert stack also publishes a **`LIVE` alias** (`AuthFnLive`) on the auth function pointing to the current version. CloudFront itself still needs the numeric version ARN (CloudFront rejects alias ARNs), which is passed cross-region from cert stack to main stack via CDK’s SSM-backed `crossRegionReferences` mechanism. The LIVE alias exists for monitoring and future architectural options.
+
+**Token rotation deploys normally** — just run `./deploy.ps1` (or `cdk deploy --all`) with the new token. The cross-region SSM export updates to the new version ARN, then CloudFront is updated. If a deploy fails mid-way and CloudFormation gets stuck in UPDATE_ROLLBACK_FAILED on `ExportsWriteruswest209BD44F0A7CF058B`, recover with:
+```
+aws cloudformation continue-update-rollback --stack-name GoodHabitTrackerCert --region us-east-1 --resources-to-skip ExportsWriteruswest209BD44F0A7CF058B
+```
+Then re-run `cdk deploy --all` once credentials and connectivity are confirmed.
 
 ### Unlock on phones
 
