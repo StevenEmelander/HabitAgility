@@ -4,6 +4,12 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.10.3] - 2026-05-19
+
+### Fixed
+
+- **Date pickers no longer overflow** on the Plan tab. Previous layout was a `1fr 1fr` CSS grid that stacked to `1fr` at `≤480 px` viewport. The `1fr` default is `minmax(auto, 1fr)`, meaning the column can't shrink below the date input's intrinsic content width — so on viewports just above the breakpoint (iPad mini portrait 768 px, iPhone Pro Max landscape, Safari split-screen) the END date overflowed its column even though START fit. Verified at iPhone width with the page rendered in a 388 px simulator: the previous grid showed the END date and its calendar icon spilling past the card; the new flex-column layout fits both inputs cleanly within the boundary. Trades trivial vertical space (one extra row) for zero overflow risk at any viewport.
+
 ## [0.10.2] - 2026-05-19
 
 Plan-tab compaction. The 0.10.1 "restructure" just added section labels; this

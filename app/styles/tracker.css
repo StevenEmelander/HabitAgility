@@ -280,11 +280,17 @@ body {
 .plan-input:focus { outline: none; border-color: var(--accent); }
 .plan-sprint-name { font-size: 16px; font-weight: 600; }
 .plan-sprint-desc { min-height: 60px; }
-.plan-date-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+/* Stack the date pickers always. Previously a 1fr 1fr grid with a
+   @media (max-width: 480px) stack — but `1fr` is `minmax(auto, 1fr)`, so the
+   column can't shrink below the date input's intrinsic width. On viewports
+   just above the breakpoint (iPad mini portrait 768 px, iPhone Pro Max
+   landscape, Safari split-screen) the END date overflowed its column even
+   though START fit. Stacking always trades a trivial vertical savings for
+   zero overflow risk. */
+.plan-date-row { display: flex; flex-direction: column; gap: 8px; }
 .plan-date-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .plan-date-field .plan-lbl { font-size: 10px; letter-spacing: 0.08em; color: var(--muted); text-transform: uppercase; }
 .plan-date-input { width: 100%; box-sizing: border-box; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 16px; padding: 8px 10px; color-scheme: dark; min-width: 0; }
-@media (max-width: 480px) { .plan-date-row { grid-template-columns: 1fr; } }
 
 .trends-sprint-nav { gap: 8px; align-items: center; margin-bottom: 6px; }
 .trends-sprint-navbtn { flex-shrink: 0; }
