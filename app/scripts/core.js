@@ -13,7 +13,7 @@ import {
   TOAST_DISMISS_MS,
 } from './constants.js';
 import { renderEntry } from './entry-ui.js';
-import { renderAddHabitModal, renderPlan } from './plan-ui.js';
+import { renderAddHabitModal, renderPlan, renderTextModal } from './plan-ui.js';
 import {
   canEditRetrospective,
   categoryPoints,
@@ -85,6 +85,9 @@ export const state = {
   /** When stepping through sprints in the trends view, this holds the focused sprintId. */
   trendsSprintId: null,
   addHabitDraft: null,
+  /** Generic text-input modal (replaces window.prompt for add-category, rename-category, rename-habit).
+   *  Shape: { kind, title, hint?, placeholder?, initialValue?, okLabel?, maxlength?, id? } | null */
+  textModal: null,
 
   /** Per-item dirty tracking */
   _dirtySprintIds: {},
@@ -314,6 +317,7 @@ export function load() {
   state.trendsStep = 0;
   state.trendsSprintId = null;
   state.addHabitDraft = null;
+  state.textModal = null;
 }
 
 export function render() {
@@ -361,6 +365,7 @@ export function render() {
       <button class="tab ${state.tab === 'trends' ? 'active' : ''}" role="tab" aria-selected="${state.tab === 'trends'}" data-action="tab" data-tab="trends">BURNDOWN</button>
       <button class="tab ${state.tab === 'plan' ? 'active' : ''}" role="tab" aria-selected="${state.tab === 'plan'}" data-action="tab" data-tab="plan">PLAN</button>
     </nav>
-    ${state.addHabitDraft ? renderAddHabitModal() : ''}`;
-  document.body.style.overflow = state.addHabitDraft ? 'hidden' : '';
+    ${state.addHabitDraft ? renderAddHabitModal() : ''}
+    ${state.textModal ? renderTextModal() : ''}`;
+  document.body.style.overflow = state.addHabitDraft || state.textModal ? 'hidden' : '';
 }

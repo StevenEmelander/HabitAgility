@@ -325,29 +325,27 @@ body {
 .habit-bool.on .habit-bool-label { font-weight: 600; }
 .habit-bool-pts { font-size: 13px; flex-shrink: 0; }
 
-/* ───────── Plan tab scoring group ───────── */
-.plan-goal-headline {
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1.12;
-  margin-bottom: 8px;
-}
-.plan-goal-headline-unit {
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 500;
-  margin-left: 4px;
-}
-.plan-length-line { font-size: 11px; margin-top: 6px; }
+/* ───────── Plan tab sprint card ───────── */
+/* The sprint card is broken into labeled sections (SCHEDULE / SCORING) so
+   each cluster of related controls reads on its own, rather than as one
+   tall stack of inputs and steppers.
 
-/* Visually groups the goal stepper + point-step selector under a "SCORING"
-   caption so it reads as one settings cluster, not two adjacent button rows. */
-.plan-scoring {
+   Top of card: small "CURRENT SPRINT" / "UPCOMING SPRINT" caption, then the
+   meta block (name + description), then SCHEDULE, then SCORING. */
+.plan-sprint-head { margin-bottom: 6px; }
+.plan-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.plan-section {
   margin-top: 12px;
   padding-top: 10px;
   border-top: 1px solid var(--border);
 }
-.plan-scoring-label {
+.plan-section-label {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 10px;
   letter-spacing: 0.09em;
@@ -355,6 +353,7 @@ body {
   text-transform: uppercase;
   margin-bottom: 8px;
 }
+.plan-length-line { font-size: 11px; margin-top: 6px; }
 .plan-scoring-row {
   display: flex;
   flex-wrap: wrap;
@@ -363,6 +362,27 @@ body {
 }
 .plan-scoring-row-step { margin-top: 8px; gap: 5px; }
 .plan-scoring-unit { font-size: 11px; }
+
+/* Warning + planning hint cards: visually distinct via border color. */
+.plan-warning {
+  border-color: var(--danger);
+  color: var(--danger);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.plan-hint {
+  border-color: var(--plan);
+  color: var(--plan);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* Empty state when no categories exist on the focused sprint. */
+.plan-empty { padding: 16px; text-align: center; }
+.plan-empty-title { font-size: 14px; font-weight: 600; margin-bottom: 6px; color: var(--text); }
+.plan-empty-body { font-size: 13px; line-height: 1.5; color: var(--muted); }
+
+.plan-loading { font-size: 14px; line-height: 1.45; }
 
 /* ───────── Trends tab ───────── */
 .trends-mode-switch {

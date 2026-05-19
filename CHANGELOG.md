@@ -4,6 +4,43 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-05-19
+
+Plan-tab re-evaluation + testing infrastructure. No infra changes — pure
+front-end + lambda-side refactor for testability.
+
+### UX (Plan tab)
+
+- **Sprint card restructured into labeled sections.** Top-of-card caption (CURRENT SPRINT / UPCOMING SPRINT) then a meta block (name + description), then a **SCHEDULE** section (dates + length), then the existing **SCORING** section (goal + step). Each new section gets a thin border-top + a small mono caption — reads as three logical clusters instead of one tall stack of inputs.
+- **Removed the duplicate goal/day headline.** The big "10 goal/day" number that appeared above the date row was a redundant display of the same value the Goal stepper already shows. The stepper is the editable surface; the headline was just visual noise.
+- **Empty-state card** when the focused sprint has no categories. Replaces the previously-empty gap below the "+ Category" toolbar. Includes example category names for first-time users.
+- **Habit kind labels: `Y/N` → `YES/NO`, `CNT` → `COUNT`.** The 3-character codes were opaque on first encounter; the longer labels are still short enough to fit in the button row.
+
+### Text-input modal (replaces `window.prompt` for 3 sites)
+
+- **New generic `renderTextModal()` + `state.textModal` shape** in `plan-ui.js`. Used by **add-category**, **rename-category**, and **rename-habit** instead of the iOS-ugly native `prompt()` dialogs.
+- **Auto-focus + auto-select** of the pre-filled value on open (matching the existing add-habit modal pattern).
+- **Enter submits, Escape cancels** via a new keydown delegate on `document.body`. Matches what `prompt()` gave for free; iOS Safari's keyboard Return key now submits the modal.
+- **Backdrop click cancels.** Modal alert content shielded from event bubbling so the cancel only fires when clicking outside the alert box.
+
+### Testing
+
+- **Extracted pure helpers** from `infrastructure/lambdas/sync/sprints.js` into a new `sprint-helpers.js` module. `findCovering`, `safeLengthDays`, `safeGoalPoints`, `safePointStep`, `sprintItemToObject`, `sprintObjectToItem` all live there now and import only from `constants.js` + `utils.js` (no `@aws-sdk/*` chain) — so they're importable from the root `tests/` without requiring the SDK at the test runner's resolution scope. `sprints.js` re-exports them so all existing callers (`entries.js`, `summaries.js`) work unchanged.
+- **`tests/lambda-utils.test.js`** — 34 new tests covering `addDays` (positive/negative/boundaries), `daysBetweenInclusive`, `clampToToday`, `quantize` (float drift, type coercion), `clampText`, `safeJsonParseObject` (incl. non-object inputs), `isValidDateKey`, `isValidSprintId`, `parseSprintIdParam`, `todayKey`.
+- **`tests/lambda-sprint-helpers.test.js`** — 29 new tests covering the three `safe*` validators (edge cases, type coercion, range clamping), `sprintObjectToItem` ↔ `sprintItemToObject` round-trips for both started and planning sprints, and `findCovering` (no sprints, started-only, planning fallback, multiple planning, sparse arrays).
+- **Tests caught real code looseness in three helpers:**
+  - `safeLengthDays(null)` was returning `1` (because `Number(null) === 0` is finite and clamps to 1) instead of falling back to the default. Added explicit `null`/`undefined`/`''` guard at the top.
+  - `safeGoalPoints(null)` had the same bug — returning `0` instead of `10`. Same guard.
+  - `safeJsonParseObject('[]')` was returning `[]` because `typeof [] === 'object'`. Tightened to also reject arrays — callers always expect a plain object and would have surfaced `body.categories === undefined` otherwise.
+- **101 tests pass** (was 38).
+
+### Code cleanup
+
+- Plan-tab warning + planning-hint cards moved from inline `style` strings to `.plan-warning` and `.plan-hint` CSS classes.
+- "CURRENT SPRINT" caption + meta-block wrapper moved to `.plan-sprint-head` + `.plan-meta`.
+- Loading-state muted text moved to `.plan-loading`.
+- `findCovering`, `sprint*` shape helpers, and the `safe*` validators are now in `sprint-helpers.js` with comments documenting the test-importability design.
+
 ## [0.10] - 2026-05-19
 
 UX polish + UI rename pass driven by walking each tab on a phone. **No API

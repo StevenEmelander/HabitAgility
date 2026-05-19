@@ -3,14 +3,11 @@ const { client } = require('./db');
 const {
   ROWS_TABLE,
   PK_SPRINT_DEF,
-  DEFAULT_GOAL_POINTS,
   SPRINT_NAME_MAX,
   SPRINT_DESC_MAX,
   SPRINT_RETRO_MAX,
 } = require('./constants');
 const {
-  nowIso,
-  safeJsonParseObject,
   isValidDateKey,
   isValidSprintId,
   jsonResponse,
@@ -19,85 +16,16 @@ const {
   todayKey,
 } = require('./utils');
 const { claimNextSprintId } = require('./meta');
-
-// ── Validation helpers ────────────────────────────────────────────────
-
-// Clamp a length value to a sane integer in [1, 365]. Defends against NaN /
-// non-numeric / negative / unreasonably-large values from a buggy or hostile
-// client. Returns the default if the input doesn't parse.
-function safeLengthDays(value, fallback = 14) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return fallback;
-  const rounded = Math.round(n);
-  if (rounded < 1) return 1;
-  if (rounded > 365) return 365;
-  return rounded;
-}
-
-// Clamp a goal-points value to a non-negative finite number, capped at 10_000.
-// Returns the fallback if the input doesn't parse.
-function safeGoalPoints(value, fallback = DEFAULT_GOAL_POINTS) {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n < 0) return fallback;
-  if (n > 10000) return 10000;
-  return n;
-}
-
-// pointStep must be one of the canonical step values (mirrors the front-end's
-// POINT_STEPS); reject anything else so an arbitrary step doesn't get persisted.
-const ALLOWED_POINT_STEPS = new Set([0.1, 0.25, 0.5, 1]);
-function safePointStep(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return undefined;
-  return ALLOWED_POINT_STEPS.has(n) ? n : undefined;
-}
-
-// ── Item shape ────────────────────────────────────────────────────────
-
-function sprintItemToObject(item) {
-  const body = safeJsonParseObject(item.bodyJson?.S);
-  return {
-    id: Number(item.dateKey.S),
-    startDate: item.startDate ? item.startDate.S : null,
-    endDate: item.endDate ? item.endDate.S : null,
-    lengthDays: item.lengthDays ? Number(item.lengthDays.N) : 0,
-    pointStep: item.pointStep ? Number(item.pointStep.N) : undefined,
-    goalPoints: item.goalPoints ? Number(item.goalPoints.N) : DEFAULT_GOAL_POINTS,
-    name: item.name ? item.name.S : '',
-    description: item.description ? item.description.S : '',
-    retrospective: item.retrospective ? item.retrospective.S : '',
-    categories: body.categories || [],
-    habitDefinitions: body.habitDefinitions || [],
-  };
-}
-
-function sprintObjectToItem(s) {
-  const item = {
-    pk: { S: PK_SPRINT_DEF },
-    dateKey: { S: String(s.id) },
-    lengthDays: { N: String(Number(s.lengthDays) || 0) },
-    bodyJson: {
-      S: JSON.stringify({ categories: s.categories || [], habitDefinitions: s.habitDefinitions || [] }),
-    },
-    updatedAt: { S: nowIso() },
-  };
-  // Dates are optional: a sprint in "planning" state (never had a first entry)
-  // has both dates null. The first PUT /api/entry covering this sprint flips
-  // it to "started" by stamping startDate = entry.dateKey, endDate = +lengthDays-1.
-  if (s.startDate) item.startDate = { S: s.startDate };
-  if (s.endDate) item.endDate = { S: s.endDate };
-  if (s.pointStep != null) item.pointStep = { N: String(Number(s.pointStep) || 1) };
-  const goal = Number(s.goalPoints);
-  item.goalPoints = { N: String(Number.isFinite(goal) && goal >= 0 ? goal : DEFAULT_GOAL_POINTS) };
-  // Optional string metadata — write only when non-empty (mirror pointStep).
-  const name = clampText(s.name, SPRINT_NAME_MAX);
-  if (name) item.name = { S: name };
-  const description = clampText(s.description, SPRINT_DESC_MAX);
-  if (description) item.description = { S: description };
-  const retrospective = clampText(s.retrospective, SPRINT_RETRO_MAX);
-  if (retrospective) item.retrospective = { S: retrospective };
-  return item;
-}
+// Pure helpers live in sprint-helpers.js (no AWS SDK deps → testable from
+// tests/ without resolving @aws-sdk at the test runner's scope).
+const {
+  safeLengthDays,
+  safeGoalPoints,
+  safePointStep,
+  sprintItemToObject,
+  sprintObjectToItem,
+  findCovering,
+} = require('./sprint-helpers');
 
 // ── CRUD ──────────────────────────────────────────────────────────────
 
@@ -133,19 +61,6 @@ async function queryAllSprintDefs() {
   } while (ExclusiveStartKey);
   out.sort((a, b) => String(a.startDate).localeCompare(String(b.startDate)));
   return out;
-}
-
-function findCovering(sprints, dateKey) {
-  // Started sprints (with set dates) that cover this date take priority.
-  const started = sprints.find(
-    (s) => s?.startDate && s.endDate && s.startDate <= dateKey && dateKey <= s.endDate,
-  );
-  if (started) return started;
-  // Fallback: the lowest-ID planning sprint (null startDate). The user's
-  // first entry into a planning sprint stamps it as started — see
-  // `handlePutEntry` in entries.js.
-  const planning = sprints.filter((s) => s && !s.startDate).sort((a, b) => (a.id || 0) - (b.id || 0))[0];
-  return planning || null;
 }
 
 // ── Route handlers ────────────────────────────────────────────────────

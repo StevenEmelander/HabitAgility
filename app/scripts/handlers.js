@@ -114,6 +114,79 @@ function getPlanModeSprint() {
   return getSprintById(state.currentSprintId + 1);
 }
 
+// ── Text-input modal ─────────────────────────────────────────────────
+// Generic single-text-field modal that replaces window.prompt() for the
+// add-category, rename-category, and rename-habit actions. Each opener
+// stashes a config in state.textModal; the OK handler dispatches by
+// state.textModal.kind to one of the TEXT_MODAL_SUBMITTERS below.
+
+const TEXT_MODAL_SUBMITTERS = {
+  'add-category': (value, sprint) => {
+    const up = value.trim().toUpperCase();
+    if (!up) return;
+    if (sprint.categories.some((c) => c.label === up)) {
+      showToast('Category exists');
+      return;
+    }
+    sprint.categories.push({
+      id: uid('cat'),
+      label: up,
+      sortOrder: sprint.categories.length + 1,
+      accent: '#d4a574',
+    });
+    pushSprint(sprint.id);
+  },
+  'rename-category': (value, sprint, ctx) => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    const c = sprint.categories.find((x) => x.id === ctx.id);
+    if (!c) return;
+    c.label = trimmed.toUpperCase();
+    pushSprint(sprint.id);
+  },
+  'rename-habit': (value, sprint, ctx) => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    const h = sprint.habitDefinitions.find((x) => x.id === ctx.id);
+    if (!h) return;
+    h.label = trimmed;
+    pushSprint(sprint.id);
+  },
+};
+
+function openTextModal(config) {
+  state.textModal = config;
+  render();
+  // Auto-focus + select the input so the user can immediately type or
+  // overwrite the pre-filled value.
+  const inp = document.getElementById('text-modal-input');
+  if (inp) {
+    inp.focus();
+    try {
+      inp.select();
+    } catch (_) {}
+  }
+}
+
+function closeTextModal() {
+  state.textModal = null;
+  document.body.style.overflow = '';
+  render();
+}
+
+function submitTextModal() {
+  const m = state.textModal;
+  if (!m) return;
+  const inp = document.getElementById('text-modal-input');
+  const value = inp?.value ?? '';
+  const sprint = getPlanModeSprint();
+  if (sprint) {
+    const submitter = TEXT_MODAL_SUBMITTERS[m.kind];
+    if (submitter) submitter(value, sprint, m);
+  }
+  closeTextModal();
+}
+
 // ── Action handlers ───────────────────────────────────────────────────
 // Each handler receives a context object: { target, action, id, delta }.
 // `target` = the matched element with data-action; `id`/`delta` are pre-parsed.
@@ -146,6 +219,16 @@ const globalActions = {
     state.addHabitDraft = null;
     document.body.style.overflow = '';
     render();
+  },
+  'text-modal-backdrop': ({ event }) => {
+    if (event.target.closest('.plan-modal-alert')) return;
+    closeTextModal();
+  },
+  'text-modal-cancel': () => {
+    closeTextModal();
+  },
+  'text-modal-ok': () => {
+    submitTextModal();
   },
   'habit-add-kind': ({ target }) => {
     const d = state.addHabitDraft;
@@ -324,32 +407,30 @@ const planActions = {
   'add-category': () => {
     const sprint = getPlanModeSprint();
     if (!sprint) return;
-    const label = prompt('New category name');
-    if (!label) return;
-    const up = label.trim().toUpperCase();
-    if (sprint.categories.some((c) => c.label === up)) {
-      showToast('Category exists');
-      return;
-    }
-    sprint.categories.push({
-      id: uid('cat'),
-      label: up,
-      sortOrder: sprint.categories.length + 1,
-      accent: '#d4a574',
+    openTextModal({
+      kind: 'add-category',
+      title: 'New category',
+      hint: 'Names are stored in upper case.',
+      placeholder: 'e.g. Health',
+      initialValue: '',
+      okLabel: 'Add',
+      maxlength: 40,
     });
-    pushSprint(sprint.id);
-    render();
   },
   'rename-category': ({ id }) => {
     const sprint = getPlanModeSprint();
     if (!sprint) return;
     const c = sprint.categories.find((x) => x.id === id);
     if (!c) return;
-    const next = prompt('Category name', c.label);
-    if (!next) return;
-    c.label = next.trim().toUpperCase();
-    pushSprint(sprint.id);
-    render();
+    openTextModal({
+      kind: 'rename-category',
+      id,
+      title: 'Rename category',
+      placeholder: 'Category name',
+      initialValue: c.label,
+      okLabel: 'Save',
+      maxlength: 40,
+    });
   },
   'remove-category': ({ id }) => {
     const sprint = getPlanModeSprint();
@@ -386,11 +467,15 @@ const planActions = {
     if (!sprint) return;
     const h = sprint.habitDefinitions.find((x) => x.id === id);
     if (!h) return;
-    const next = prompt('Habit label', h.label);
-    if (!next) return;
-    h.label = next.trim();
-    pushSprint(sprint.id);
-    render();
+    openTextModal({
+      kind: 'rename-habit',
+      id,
+      title: 'Rename habit',
+      placeholder: 'Habit name',
+      initialValue: h.label,
+      okLabel: 'Save',
+      maxlength: 120,
+    });
   },
   'switch-kind': ({ id }) => {
     const sprint = getPlanModeSprint();
@@ -557,5 +642,21 @@ export function setupHandlers() {
     if (!target || !target.matches) return;
     if (!target.matches('input[type="date"][data-field][data-sprint-id]')) return;
     handleSprintDateChange(target);
+  });
+
+  // Enter inside the text-input modal submits; Escape cancels. Mirrors what
+  // window.prompt() used to give for free, and works with virtual keyboards on
+  // iOS that surface a Return key.
+  document.body.addEventListener('keydown', (event) => {
+    const target = event.target;
+    if (!target || !target.matches) return;
+    if (!target.matches('#text-modal-input')) return;
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      submitTextModal();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      closeTextModal();
+    }
   });
 }

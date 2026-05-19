@@ -22,7 +22,7 @@ function planCatAccent(cat) {
 }
 
 function habitKindLabel(kind) {
-  return kind === 'count' ? 'CNT' : 'Y/N';
+  return kind === 'count' ? 'COUNT' : 'YES/NO';
 }
 
 export function renderAddHabitModal() {
@@ -48,6 +48,37 @@ export function renderAddHabitModal() {
   </div>`;
 }
 
+/**
+ * Generic text-input modal — replaces window.prompt() for three sites that
+ * needed a single text field: add-category, rename-category, rename-habit.
+ * Shape of state.textModal:
+ *   { kind, title, hint?, placeholder?, initialValue?, okLabel?, maxlength?, id? }
+ * Handler dispatch via state.textModal.kind in handlers.js.
+ */
+export function renderTextModal() {
+  const m = state.textModal;
+  if (!m) return '';
+  return `<div class="plan-modal-backdrop" data-action="text-modal-backdrop" role="presentation">
+    <div class="plan-modal-alert" role="dialog" aria-modal="true" aria-labelledby="text-modal-title">
+      <div id="text-modal-title" class="plan-modal-alert-title">${escapeHtml(m.title || '')}</div>
+      ${m.hint ? `<p class="plan-modal-alert-hint">${escapeHtml(m.hint)}</p>` : ''}
+      <input
+        id="text-modal-input"
+        class="plan-input-inmodal"
+        type="text"
+        placeholder="${escapeHtml(m.placeholder || '')}"
+        maxlength="${m.maxlength || 120}"
+        value="${escapeHtml(m.initialValue || '')}"
+        autocomplete="off"
+        autocapitalize="sentences" />
+      <div class="plan-modal-alert-actions">
+        <button type="button" class="btn" data-action="text-modal-cancel">Cancel</button>
+        <button type="button" class="btn primary" data-action="text-modal-ok">${escapeHtml(m.okLabel || 'OK')}</button>
+      </div>
+    </div>
+  </div>`;
+}
+
 export function renderPlan() {
   const hasEntries = hasAnyEntries();
   if (!hasEntries) state.planMode = 'current';
@@ -68,20 +99,20 @@ export function renderPlan() {
       </div>`
           : ''
       }
-      <div class="card"><div class="muted" style="font-size:14px;line-height:1.45">Loading ${sprintHead.toLowerCase()}…</div></div>
+      <div class="card"><div class="muted plan-loading">Loading ${sprintHead.toLowerCase()}…</div></div>
     </div>`;
   }
   // Past day 1, editing the current sprint's rules can change today's already-scored
   // values. Warn the user; suggest editing Next instead.
   const showCurrentWarning = state.planMode === 'current' && hasEntries && !isCurrentSprintFirstDay();
   const warning = showCurrentWarning
-    ? `<div class="card" style="border-color:var(--danger)"><div style="font-size:13px;line-height:1.4;color:var(--danger)"><strong>Heads up:</strong> editing the current sprint past day 1 can change scores you've already tallied. Consider switching to <strong>Next</strong> to plan the upcoming sprint without affecting history.</div></div>`
+    ? `<div class="card plan-warning"><strong>Heads up:</strong> editing the current sprint past day 1 can change scores you've already tallied. Consider switching to <strong>Next</strong> to plan the upcoming sprint without affecting history.</div>`
     : '';
   // Planning hint — surfaces what the disabled start-date input means on iOS
   // (no hover → tooltip is invisible). Mirrors the "Sprint hasn't started yet"
-  // message shown in Trends Sprint Overview.
+  // message shown on the Burndown tab.
   const planningHint = isSprintInPlanning(s)
-    ? `<div class="card" style="border-color:var(--plan)"><div style="font-size:13px;line-height:1.45;color:var(--plan)"><strong>Planning:</strong> this sprint hasn't started yet. The start date will be set automatically when you make your first entry on the <strong>Entries</strong> tab. Until then, adjust the end date to change the duration.</div></div>`
+    ? `<div class="card plan-hint"><strong>Planning:</strong> this sprint hasn't started yet. The start date will be set automatically when you make your first entry on the <strong>Entries</strong> tab. Until then, adjust the end date to change the duration.</div>`
     : '';
   const goal = goalForSprint(s);
   return `<div class="plan-root">
@@ -97,8 +128,8 @@ export function renderPlan() {
     ${warning}
     ${planningHint}
     <div class="card plan-sprint-card">
-      <div class="mono muted" style="font-size:10px;letter-spacing:0.07em;margin-bottom:6px">${sprintHead.toUpperCase()}</div>
-      <div class="col" style="gap:8px;margin-bottom:10px">
+      <div class="mono muted plan-section-label plan-sprint-head">${sprintHead.toUpperCase()}</div>
+      <div class="plan-meta">
         <input
           type="text"
           class="plan-input plan-sprint-name"
@@ -118,11 +149,13 @@ export function renderPlan() {
           placeholder="Description / intent for this sprint"
           autocapitalize="sentences">${escapeHtml(s.description || '')}</textarea>
       </div>
-      <div class="plan-goal-headline">${fmtPointsForStep(goal, step)}<span class="plan-goal-headline-unit">goal/day</span></div>
-      ${renderSprintDates(s)}
-      <div class="mono muted plan-length-line">${s.lengthDays} day${s.lengthDays === 1 ? '' : 's'}${isSprintInPlanning(s) ? ' · planning' : ''}</div>
-      <div class="plan-scoring">
-        <div class="plan-scoring-label">SCORING</div>
+      <div class="plan-section">
+        <div class="plan-section-label">SCHEDULE</div>
+        ${renderSprintDates(s)}
+        <div class="mono muted plan-length-line">${s.lengthDays} day${s.lengthDays === 1 ? '' : 's'}${isSprintInPlanning(s) ? ' · planning' : ''}</div>
+      </div>
+      <div class="plan-section">
+        <div class="plan-section-label">SCORING</div>
         <div class="plan-scoring-row">
           <span class="plan-lbl">Goal:</span>
           <button type="button" class="btn" data-action="goal-step" data-delta="-1" aria-label="Decrease goal">−</button>
@@ -139,7 +172,14 @@ export function renderPlan() {
         <button type="button" class="btn primary" data-action="add-category">+ Category</button>
       </div>
     </div>
-    ${categories.map((cat) => renderPlanCategory(s, cat, step)).join('')}
+    ${
+      categories.length === 0
+        ? `<div class="card plan-empty">
+            <div class="plan-empty-title">No categories yet</div>
+            <div class="plan-empty-body">Tap <strong>+ Category</strong> above to group your habits. Common starting points: <em>Health</em>, <em>Focus</em>, <em>Recovery</em>.</div>
+          </div>`
+        : categories.map((cat) => renderPlanCategory(s, cat, step)).join('')
+    }
   </div>`;
 }
 

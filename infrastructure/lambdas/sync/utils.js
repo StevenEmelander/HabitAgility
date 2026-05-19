@@ -82,11 +82,15 @@ function getBody(event) {
 
 // ── JSON parsing ──────────────────────────────────────────────────────
 
+// Parse a JSON string and return ONLY a plain object — primitives, arrays,
+// and null all collapse to `{}`. Callers (entry valuesJson, sprint bodyJson)
+// always expect an object shape; tightening here prevents `body.categories ||
+// []` from surfacing surprising results if a caller ever stores an array.
 function safeJsonParseObject(s) {
   if (!s) return {};
   try {
     const v = JSON.parse(s);
-    return v && typeof v === 'object' ? v : {};
+    return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
   } catch {
     return {};
   }
