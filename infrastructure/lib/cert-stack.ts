@@ -41,6 +41,12 @@ export class CertStack extends cdk.Stack {
     }
     fs.writeFileSync(path.join(authSrcDir, 'index.js'), authOut);
 
+    // Lambda@Edge: keep memorySize at the default 128 MB — the function is
+    // trivial (single SHA-256 + cookie parse) and edge billing rounds aggressively.
+    // CDK can't set logRetention here: Edge logs land in the CloudWatch region
+    // closest to each viewer. Retention is set on each `/aws/lambda/<region>.…`
+    // log group manually in the console (or via a region-fanned-out helper);
+    // tracked as a v0.10 ops follow-up.
     const authFn = new lambda.Function(this, 'AuthFn', {
       functionName: 'good-habit-tracker-auth',
       runtime: lambda.Runtime.NODEJS_20_X,

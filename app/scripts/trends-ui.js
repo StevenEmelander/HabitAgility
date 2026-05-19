@@ -218,16 +218,20 @@ function renderSprintOverview() {
   // (past + current sprints). Hide entirely on upcoming sprints with no
   // retro yet — no value in showing a locked empty box.
   const showRetro = retro || canEditRetro;
+  // <label> wraps both the caption and the textarea so the visible label is
+  // properly associated for screen readers (no `for=`/id needed when nested).
   const retroBlock = showRetro
     ? `<div class="card">
-        <div class="trends-retro-label">RETROSPECTIVE</div>
-        <textarea
-          class="trends-retro-input"
-          data-field="sprint-retrospective"
-          data-sprint-id="${sprint.id}"
-          maxlength="${SPRINT_RETRO_MAX}"
-          placeholder="What worked? What didn’t? What to carry forward?"
-          autocapitalize="sentences">${escapeHtml(retro)}</textarea>
+        <label>
+          <span class="trends-retro-label">RETROSPECTIVE</span>
+          <textarea
+            class="trends-retro-input"
+            data-field="sprint-retrospective"
+            data-sprint-id="${sprint.id}"
+            maxlength="${SPRINT_RETRO_MAX}"
+            placeholder="What worked? What didn’t? What to carry forward?"
+            autocapitalize="sentences">${escapeHtml(retro)}</textarea>
+        </label>
       </div>`
     : '';
 

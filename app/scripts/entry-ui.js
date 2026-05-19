@@ -76,10 +76,12 @@ function renderEntryCategory(s, e, cat, step) {
 
 function renderEntryHabit(h, e, accent, step) {
   const v = e.habitValuesById?.[h.id];
+  const hid = escapeHtml(h.id);
+  const labelText = escapeHtml(h.label);
   if (h.kind === 'boolean') {
     const on = !!v;
     const pts = fmtPointsForStep(h.scoring.points || 0, step);
-    return `<button class="card2 row between habit" data-action="toggle-habit" data-id="${h.id}"><div>${escapeHtml(h.label)}</div><div class="mono" style="color:${on ? accent : 'var(--muted)'}">${on ? '● +' + pts : '○ +' + pts}</div></button>`;
+    return `<button class="card2 row between habit" data-action="toggle-habit" data-id="${hid}" aria-pressed="${on}" aria-label="${labelText}, ${on ? 'on' : 'off'}, +${pts} points"><div>${labelText}</div><div class="mono" style="color:${on ? accent : 'var(--muted)'}">${on ? '● +' + pts : '○ +' + pts}</div></button>`;
   }
   const n = Number(v || 0);
   const limit = Number(h.scoring.dailyLimit) || 0;
@@ -93,7 +95,7 @@ function renderEntryHabit(h, e, accent, step) {
   // Counter: "n / limit" when bounded, just "n" when unlimited.
   const counterDisplay = limit > 0 ? `${n} / ${limit}` : `${n}`;
   return `<div class="card2">
-    <div class="row between"><div>${escapeHtml(h.label)}</div><div class="mono" style="color:${accent}">${headerPts}</div></div>
-    <div class="counter"><button class="btn" data-action="counter-habit" data-id="${h.id}" data-delta="-1">−</button><div class="mono center">${counterDisplay}</div><button class="btn" data-action="counter-habit" data-id="${h.id}" data-delta="1">+</button></div>
+    <div class="row between"><div>${labelText}</div><div class="mono" style="color:${accent}">${headerPts}</div></div>
+    <div class="counter"><button class="btn" data-action="counter-habit" data-id="${hid}" data-delta="-1" aria-label="Decrement ${labelText}">−</button><div class="mono center" aria-live="polite">${counterDisplay}</div><button class="btn" data-action="counter-habit" data-id="${hid}" data-delta="1" aria-label="Increment ${labelText}">+</button></div>
   </div>`;
 }

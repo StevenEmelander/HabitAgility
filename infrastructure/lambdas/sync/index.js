@@ -1,5 +1,5 @@
 const { CF_SECRET } = require('./constants');
-const { jsonResponse, plainResponse, getBody, parseSprintIdParam } = require('./utils');
+const { jsonResponse, plainResponse, getBody, BODY_TOO_LARGE, parseSprintIdParam } = require('./utils');
 const { handleGetSprint, handlePutSprint, handlePostSprint } = require('./sprints');
 const { handleGetEntry, handlePutEntry } = require('./entries');
 const { handleTrendSprintDetail, handleTrendSprintSummary } = require('./summaries');
@@ -29,17 +29,23 @@ exports.handler = async (event) => {
   const route = matchPath(path);
   if (!route) return plainResponse(404, 'Not Found');
 
+  // Parse body once for mutating routes; reject oversized payloads (64 KiB cap
+  // applied inside `getBody`) before any handler sees them.
+  const needsBody = method === 'POST' || method === 'PUT';
+  const body = needsBody ? getBody(event) : null;
+  if (body === BODY_TOO_LARGE) return plainResponse(413, 'Payload Too Large');
+
   try {
-    if (route.kind === 'sprint-create' && method === 'POST') return await handlePostSprint(getBody(event));
+    if (route.kind === 'sprint-create' && method === 'POST') return await handlePostSprint(body);
     if (route.kind === 'sprint-item') {
       const sid = parseSprintIdParam(route.sprintIdRaw);
       if (sid == null) return plainResponse(400, 'Invalid sprintId');
       if (method === 'GET') return await handleGetSprint(sid);
-      if (method === 'PUT') return await handlePutSprint(sid, getBody(event));
+      if (method === 'PUT') return await handlePutSprint(sid, body);
     }
     if (route.kind === 'entry-item') {
       if (method === 'GET') return await handleGetEntry(route.dateKey);
-      if (method === 'PUT') return await handlePutEntry(route.dateKey, getBody(event));
+      if (method === 'PUT') return await handlePutEntry(route.dateKey, body);
     }
     if (route.kind === 'trend-sprint' && method === 'GET') {
       const sid = parseSprintIdParam(route.sprintIdRaw);
@@ -49,6 +55,9 @@ exports.handler = async (event) => {
     if (route.kind === 'trend-summary' && method === 'GET') return await handleTrendSprintSummary();
     return plainResponse(405, 'Method Not Allowed');
   } catch (err) {
-    return jsonResponse(500, { error: 'internal', message: String(err?.message || err) });
+    // Don't leak internal error details (SDK error messages, ARNs, table names)
+    // to the client — log server-side, return a generic 500.
+    console.error('handler error:', err);
+    return jsonResponse(500, { error: 'internal' });
   }
 };

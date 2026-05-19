@@ -4,7 +4,9 @@
   --card2:#1a1a22;
   --border:rgba(255,255,255,.08);
   --text:#ede6d6;
-  --muted:#7a7a85;
+  /* --muted bumped from #7a7a85 to #9a9aa5 — the 4.4:1 contrast at 10-12 px
+     small-text was borderline-uncomfortable on the dark theme. ~6.4:1 now. */
+  --muted:#9a9aa5;
   --accent:#d4a574;
   --plan:#c79bd9;
   --danger:#c97a6e;
@@ -68,8 +70,14 @@ body {
     max(10px, env(safe-area-inset-right, 0px))
     max(12px, calc(10px + env(safe-area-inset-bottom, 0px)))
     max(10px, env(safe-area-inset-left, 0px));
-  background: #0b0b10;
-  border-top: 1px solid var(--border);
+  background: rgba(11, 11, 16, 0.92);
+  /* Stronger separator so the toolbar reads as a fixed shelf, not "stuck to the
+     bottom of the list." Backdrop-blur where supported keeps the area legible
+     even when content scrolls under it. */
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .btn,
@@ -78,8 +86,12 @@ body {
   background: #111119;
   color: var(--text);
   border-radius: 10px;
-  padding: 8px 10px;
+  /* min-height 44 px gets touch targets up to Apple HIG / WCAG 2.5.5 (Target
+     Size). Old 32 px buttons caused mis-taps on the most-used Entry counters. */
+  min-height: 44px;
+  padding: 10px 14px;
   font-size: 14px;
+  cursor: pointer;
 }
 
 .tab.active,
@@ -87,11 +99,20 @@ body {
 .btn.plan { border-color: var(--plan); color: var(--plan); }
 .btn.danger { border-color: var(--danger); color: var(--danger); }
 
+/* Keyboard focus is now visible — previously only .plan-input had a focus
+   outline, leaving keyboard users unable to see where they were. */
+.btn:focus-visible,
+.tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .progress { height: 8px; border-radius: 999px; background: #232331; overflow: hidden; }
 .fill { height: 100%; background: var(--accent); }
 .habit { cursor: pointer; }
 .pill { border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; font-size: 12px; }
-.counter { display: grid; grid-template-columns: 36px 1fr 36px; gap: 6px; align-items: center; margin-top: 8px; }
+/* Counter increment/decrement buttons need adequate width to be reliably tappable. */
+.counter { display: grid; grid-template-columns: 48px 1fr 48px; gap: 6px; align-items: center; margin-top: 8px; }
 .center { text-align: center; }
 
 .toast {

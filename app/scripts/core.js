@@ -352,10 +352,10 @@ export function render() {
       </div>
       ${state.tab === 'entry' ? renderEntry() : state.tab === 'trends' ? renderTrends() : renderPlan()}
     </div>
-    <nav class="tabs">
-      <button class="tab ${state.tab === 'entry' ? 'active' : ''}" data-action="tab" data-tab="entry">ENTRIES</button>
-      <button class="tab ${state.tab === 'trends' ? 'active' : ''}" data-action="tab" data-tab="trends">TRENDS</button>
-      <button class="tab ${state.tab === 'plan' ? 'active' : ''}" data-action="tab" data-tab="plan">PLAN</button>
+    <nav class="tabs" aria-label="Main">
+      <button class="tab ${state.tab === 'entry' ? 'active' : ''}" role="tab" aria-selected="${state.tab === 'entry'}" data-action="tab" data-tab="entry">ENTRIES</button>
+      <button class="tab ${state.tab === 'trends' ? 'active' : ''}" role="tab" aria-selected="${state.tab === 'trends'}" data-action="tab" data-tab="trends">TRENDS</button>
+      <button class="tab ${state.tab === 'plan' ? 'active' : ''}" role="tab" aria-selected="${state.tab === 'plan'}" data-action="tab" data-tab="plan">PLAN</button>
     </nav>
     ${state.addHabitDraft ? renderAddHabitModal() : ''}`;
   document.body.style.overflow = state.addHabitDraft ? 'hidden' : '';

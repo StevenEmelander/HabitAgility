@@ -59,11 +59,20 @@ function plainResponse(statusCode, text) {
   return { statusCode, headers: { 'Content-Type': 'text/plain' }, body: text };
 }
 
+// Request body cap: 64 KiB. Sprint defs with very large category/habit arrays
+// are well under this; an oversized POST/PUT signals abuse or a client bug.
+// The Lambda Function URL accepts up to 6 MB which would otherwise pass through
+// unchecked. Sentinel return value: a Symbol distinguishes "body too large" from
+// "no body" or "JSON parse failed."
+const MAX_BODY_BYTES = 64 * 1024;
+const BODY_TOO_LARGE = Symbol('BODY_TOO_LARGE');
+
 function getBody(event) {
   const raw = event.isBase64Encoded
     ? Buffer.from(event.body || '', 'base64').toString('utf8')
     : event.body || '';
   if (!raw) return null;
+  if (Buffer.byteLength(raw, 'utf8') > MAX_BODY_BYTES) return BODY_TOO_LARGE;
   try {
     return JSON.parse(raw);
   } catch {
@@ -108,6 +117,7 @@ module.exports = {
   jsonResponse,
   plainResponse,
   getBody,
+  BODY_TOO_LARGE,
   safeJsonParseObject,
   isValidDateKey,
   isValidSprintId,

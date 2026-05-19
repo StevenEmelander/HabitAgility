@@ -20,6 +20,38 @@ const {
 } = require('./utils');
 const { claimNextSprintId } = require('./meta');
 
+// ── Validation helpers ────────────────────────────────────────────────
+
+// Clamp a length value to a sane integer in [1, 365]. Defends against NaN /
+// non-numeric / negative / unreasonably-large values from a buggy or hostile
+// client. Returns the default if the input doesn't parse.
+function safeLengthDays(value, fallback = 14) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  const rounded = Math.round(n);
+  if (rounded < 1) return 1;
+  if (rounded > 365) return 365;
+  return rounded;
+}
+
+// Clamp a goal-points value to a non-negative finite number, capped at 10_000.
+// Returns the fallback if the input doesn't parse.
+function safeGoalPoints(value, fallback = DEFAULT_GOAL_POINTS) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return fallback;
+  if (n > 10000) return 10000;
+  return n;
+}
+
+// pointStep must be one of the canonical step values (mirrors the front-end's
+// POINT_STEPS); reject anything else so an arbitrary step doesn't get persisted.
+const ALLOWED_POINT_STEPS = new Set([0.1, 0.25, 0.5, 1]);
+function safePointStep(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return undefined;
+  return ALLOWED_POINT_STEPS.has(n) ? n : undefined;
+}
+
 // ── Item shape ────────────────────────────────────────────────────────
 
 function sprintItemToObject(item) {
@@ -158,14 +190,14 @@ async function handlePutSprint(sprintId, body) {
     id: sprintId,
     startDate: incomingStart,
     endDate: incomingEnd,
-    lengthDays: body.lengthDays,
-    pointStep: body.pointStep,
-    goalPoints: body.goalPoints,
+    lengthDays: safeLengthDays(body.lengthDays, oldSprint.lengthDays || 14),
+    pointStep: safePointStep(body.pointStep),
+    goalPoints: safeGoalPoints(body.goalPoints, oldSprint.goalPoints),
     name: clampText(body.name, SPRINT_NAME_MAX),
     description: clampText(body.description, SPRINT_DESC_MAX),
     retrospective: clampText(body.retrospective, SPRINT_RETRO_MAX),
-    categories: body.categories || [],
-    habitDefinitions: body.habitDefinitions || [],
+    categories: Array.isArray(body.categories) ? body.categories : [],
+    habitDefinitions: Array.isArray(body.habitDefinitions) ? body.habitDefinitions : [],
   };
   await putSprintDef(updated);
 
@@ -240,14 +272,14 @@ async function handlePostSprint(body) {
     id,
     startDate: incomingStart,
     endDate: incomingEnd,
-    lengthDays: body.lengthDays,
-    pointStep: body.pointStep,
-    goalPoints: body.goalPoints,
+    lengthDays: safeLengthDays(body.lengthDays),
+    pointStep: safePointStep(body.pointStep),
+    goalPoints: safeGoalPoints(body.goalPoints),
     name: clampText(body.name, SPRINT_NAME_MAX),
     description: clampText(body.description, SPRINT_DESC_MAX),
     retrospective: clampText(body.retrospective, SPRINT_RETRO_MAX),
-    categories: body.categories || [],
-    habitDefinitions: body.habitDefinitions || [],
+    categories: Array.isArray(body.categories) ? body.categories : [],
+    habitDefinitions: Array.isArray(body.habitDefinitions) ? body.habitDefinitions : [],
   };
   await putSprintDef(sprint);
   return jsonResponse(201, sprint);

@@ -77,6 +77,12 @@ export function renderPlan() {
   const warning = showCurrentWarning
     ? `<div class="card" style="border-color:var(--danger)"><div style="font-size:13px;line-height:1.4;color:var(--danger)"><strong>Heads up:</strong> editing the current sprint past day 1 can change scores you've already tallied. Consider switching to <strong>Next</strong> to plan the upcoming sprint without affecting history.</div></div>`
     : '';
+  // Planning hint — surfaces what the disabled start-date input means on iOS
+  // (no hover → tooltip is invisible). Mirrors the "Sprint hasn't started yet"
+  // message shown in Trends Sprint Overview.
+  const planningHint = isSprintInPlanning(s)
+    ? `<div class="card" style="border-color:var(--plan)"><div style="font-size:13px;line-height:1.45;color:var(--plan)"><strong>Planning:</strong> this sprint hasn't started yet. The start date will be set automatically when you make your first entry on the <strong>Entries</strong> tab. Until then, adjust the end date to change the duration.</div></div>`
+    : '';
   const goal = goalForSprint(s);
   return `<div class="plan-root">
     <div class="plan-h">Plan</div>
@@ -89,6 +95,7 @@ export function renderPlan() {
         : ''
     }
     ${warning}
+    ${planningHint}
     <div class="card plan-sprint-card">
       <div class="mono muted" style="font-size:10px;letter-spacing:0.07em;margin-bottom:6px">${sprintHead.toUpperCase()}</div>
       <div class="col" style="gap:8px;margin-bottom:10px">
@@ -192,13 +199,14 @@ function renderPointStepSelector(currentStep) {
 
 function renderPlanCategory(sprint, cat, step) {
   const habits = (sprint.habitDefinitions || []).filter((h) => h.categoryId === cat.id);
+  const cid = escapeHtml(cat.id);
   return `<div class="card plan-cat" style="--cat-accent:${planCatAccent(cat)}">
     <div class="plan-cat-head">
       <div class="plan-cat-title">${escapeHtml(cat.label)}</div>
       <div class="plan-btns">
-        <button type="button" class="btn" data-action="rename-category" data-id="${cat.id}" aria-label="Rename category">Name</button>
-        <button type="button" class="btn" data-action="add-habit" data-id="${cat.id}" aria-label="Add habit">+ Habit</button>
-        <button type="button" class="btn danger" data-action="remove-category" data-id="${cat.id}" aria-label="Delete category">Remove</button>
+        <button type="button" class="btn" data-action="rename-category" data-id="${cid}" aria-label="Rename category">Name</button>
+        <button type="button" class="btn" data-action="add-habit" data-id="${cid}" aria-label="Add habit">+ Habit</button>
+        <button type="button" class="btn danger" data-action="remove-category" data-id="${cid}" aria-label="Delete category">Remove</button>
       </div>
     </div>
     <div class="col plan-cat-habits">${habits.map((h) => renderPlanHabit(h, step)).join('')}</div>
@@ -206,13 +214,14 @@ function renderPlanCategory(sprint, cat, step) {
 }
 
 function renderPlanHabit(h, step) {
+  const hid = escapeHtml(h.id);
   const ptsOn = h.scoring.points || 0;
   const ppu = h.scoring.pointsPerUnit || 0;
   const limit = Number(h.scoring.dailyLimit) || 0;
   const stepper = (field, delta, display) => `<div class="row plan-stepper">
-    <button type="button" class="btn" data-action="score-edit" data-id="${h.id}" data-field="${field}" data-delta="${-delta}">−</button>
+    <button type="button" class="btn" data-action="score-edit" data-id="${hid}" data-field="${field}" data-delta="${-delta}" aria-label="Decrease ${field}">−</button>
     <div class="mono plan-stepper-val">${display}</div>
-    <button type="button" class="btn" data-action="score-edit" data-id="${h.id}" data-field="${field}" data-delta="${delta}">+</button>
+    <button type="button" class="btn" data-action="score-edit" data-id="${hid}" data-field="${field}" data-delta="${delta}" aria-label="Increase ${field}">+</button>
   </div>`;
   const scoreBtns =
     h.kind === 'boolean'
@@ -236,9 +245,9 @@ function renderPlanHabit(h, step) {
     <div class="plan-habit-top">
       <div class="plan-habit-name">${escapeHtml(h.label)}</div>
       <div class="plan-btns plan-btns-single">
-        <button type="button" class="btn" data-action="rename-habit" data-id="${h.id}" aria-label="Rename habit">✎</button>
-        <button type="button" class="btn plan-kind" data-action="switch-kind" data-id="${h.id}" title="Switch type">${habitKindLabel(h.kind)}</button>
-        <button type="button" class="btn danger" data-action="remove-habit" data-id="${h.id}" aria-label="Delete habit">✕</button>
+        <button type="button" class="btn" data-action="rename-habit" data-id="${hid}" aria-label="Rename habit">✎</button>
+        <button type="button" class="btn plan-kind" data-action="switch-kind" data-id="${hid}" title="Switch type" aria-label="Switch habit type">${habitKindLabel(h.kind)}</button>
+        <button type="button" class="btn danger" data-action="remove-habit" data-id="${hid}" aria-label="Delete habit">✕</button>
       </div>
     </div>
     ${scoreBtns}
