@@ -4,6 +4,42 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-05-20
+
+Sync no longer fights the user. Typing in the Plan-tab textareas (sprint
+name / description / retrospective) used to jolt every ~1.5 s — the
+background save would call `render()`, which rebuilds `#app` via innerHTML,
+which destroys the focused textarea and resets the cursor. Two changes
+fix it, plus a smaller third one that just cuts API spend.
+
+### Fixed
+
+- **Sync pill mutates directly, doesn't trigger a render.** New
+  `updateSyncPill()` in `core.js` finds (or creates / removes) the
+  `.app-sync-pill` element inside the existing header and toggles its
+  text + class. `setSyncStatus()` calls it on every status change. The
+  rest of the DOM is untouched, so any focused textarea keeps focus and
+  cursor position across the SYNCING… → ok transition. The full `render()`
+  call from `flushSprint` / `flushEntry` is gone in the common path —
+  only fires when something the user can actually see changed (orphan
+  sweep, planning → started transition, or the user is on the Burndown
+  tab where the trends cache invalidation is visible).
+
+### Changed
+
+- **`SPRINT_DEBOUNCE_MS` bumped from 1500 → 2500 ms.** Prose-style edits
+  (name / description / retrospective) naturally pause longer than
+  checkbox toggles; a 2.5 s window coalesces ~40 % more keystrokes into
+  one PUT at zero UX cost. Entry debounce stays at 1500 ms so check-ins
+  feel instant against the burndown.
+
+- **Skip identical PUTs in `flushSprint` / `flushEntry`.** Each push
+  caches the JSON body that was last successfully accepted by the server;
+  if the next flush would send the same bytes, it short-circuits before
+  the network call. Catches the case where an edit gets reverted within
+  the debounce window, or where a UI action calls `pushSprint` defensively
+  without actually changing scoring data.
+
 ## [0.11.8] - 2026-05-19
 
 Fix logical-id casing in the ARecordLegacy override. The deployed logical id

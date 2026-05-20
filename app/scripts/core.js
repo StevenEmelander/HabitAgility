@@ -108,8 +108,37 @@ export function registerPushers(pushSprint, pushEntry) {
   pushEntryImpl = typeof pushEntry === 'function' ? pushEntry : () => {};
 }
 
+/**
+ * Mutate ONLY the sync-pill element — never a full render. The full render()
+ * blows away `#app` via innerHTML and any focused textarea inside it (sprint
+ * name/description/retrospective) loses focus + cursor position mid-typing.
+ * The pill lives as a child of `.app-header-meta` so we can add/remove/update
+ * it independently of the rest of the DOM.
+ */
+function updateSyncPill() {
+  const meta = document.querySelector('.app-header-meta');
+  if (!meta) return; // pre-boot or post-error screens have no header
+  const existing = meta.querySelector('.app-sync-pill');
+  if (syncStatus === 'ok' || syncStatus === 'idle') {
+    if (existing) existing.remove();
+    return;
+  }
+  const text = syncStatus === 'error' ? 'SYNC FAILED' : 'SYNCING…';
+  const cls = syncStatus === 'error' ? 'pill mono app-sync-pill app-sync-error' : 'pill mono app-sync-pill';
+  if (existing) {
+    if (existing.className !== cls) existing.className = cls;
+    if (existing.textContent !== text) existing.textContent = text;
+    return;
+  }
+  const pill = document.createElement('div');
+  pill.className = cls;
+  pill.textContent = text;
+  meta.appendChild(pill);
+}
+
 export function setSyncStatus(next) {
   syncStatus = next;
+  updateSyncPill();
 }
 
 // ── Small helpers ─────────────────────────────────────────────────────
@@ -338,16 +367,10 @@ export function render() {
     return;
   }
   const info = sprintInfo();
-  // Sync state pill: hidden when healthy, "SYNCING…" muted while in flight,
-  // "SYNC FAILED" in danger red on error.
-  const syncPill =
-    syncStatus === 'error'
-      ? '<div class="pill mono app-sync-pill app-sync-error">SYNC FAILED</div>'
-      : syncStatus === 'syncing'
-        ? '<div class="pill mono app-sync-pill">SYNCING…</div>'
-        : '';
   // Header summary: small mono caption on the right side of the title bar.
   // Mirrors the per-tab Entry context but is always visible across tabs.
+  // The sync pill is intentionally omitted here — `updateSyncPill()` mutates
+  // it independently so typing-in-progress textareas survive sync round-trips.
   const headerSummary = !info.cur
     ? 'NO SPRINT'
     : !info.cur.startDate
@@ -359,7 +382,6 @@ export function render() {
         <h1 class="app-title">HabitAgility</h1>
         <div class="app-header-meta">
           <div class="mono muted app-header-status">${headerSummary}</div>
-          ${syncPill}
         </div>
       </header>
       ${state.tab === 'entry' ? renderEntry() : state.tab === 'trends' ? renderTrends() : renderPlan()}
@@ -373,4 +395,6 @@ export function render() {
     ${state.textModal ? renderTextModal() : ''}
     ${state.actionMenu ? renderActionMenuModal() : ''}`;
   document.body.style.overflow = state.addHabitDraft || state.textModal || state.actionMenu ? 'hidden' : '';
+  // Restore the sync pill into the freshly-rebuilt header (no-op if status is ok).
+  updateSyncPill();
 }

@@ -1,7 +1,7 @@
 {
   "name": "habit-agility",
   "private": true,
-  "version": "0.11.8",
+  "version": "0.12.0",
   "description": "HabitAgility — Agile-style habit tracker (sprints, burndown, retrospectives). Root tooling (lint, format, tests). Deploy lives in infrastructure/.",
   "type": "module",
   "scripts": {

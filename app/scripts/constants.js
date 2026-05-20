@@ -16,8 +16,12 @@ export const POINT_STEPS = [0.1, 0.25, 0.5, 1];
 /** Default `pointStep` when missing on a sprint. */
 export const DEFAULT_POINT_STEP = 1;
 
-/** Per-item write debounce (ms). One pending request per item id; resets on new edit. */
-export const SPRINT_DEBOUNCE_MS = 1500;
+/** Per-item write debounce (ms). One pending request per item id; resets on new edit.
+ *  Sprint edits (name/description/retrospective prose) get a longer window than entry
+ *  edits — text-typing naturally pauses, so 2500 ms cuts API calls roughly in half vs
+ *  1500 ms with no UX cost. Entry edits (checkbox toggle, counter +/-) stay snappy at
+ *  1500 ms so the user sees their tick reflected quickly in the burndown. */
+export const SPRINT_DEBOUNCE_MS = 2500;
 export const ENTRY_DEBOUNCE_MS = 1500;
 
 // ── Sprint metadata length caps ───────────────────────────────────────

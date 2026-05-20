@@ -23,12 +23,19 @@ const sprintTimers = new Map();
 const entryTimers = new Map();
 let inflight = 0;
 
+// Skip-if-unchanged cache. A PUT body identical to the last successfully-synced
+// one is a no-op for the server; we keep the API call from happening at all.
+// Cleared on logout / boot via load(). Keyed by sprintId / dateKey, value is
+// the exact JSON-serialized body that was last accepted by the server.
+const lastSyncedSprintBody = new Map();
+const lastSyncedEntryBody = new Map();
+
 function bumpStatus() {
   setSyncStatus(inflight > 0 ? 'syncing' : 'ok');
 }
 function markError() {
+  // SetSyncStatus updates the pill directly; no full render needed.
   setSyncStatus('error');
-  render();
 }
 
 // ── Per-item pushers ───────────────────────────────────────────────────
@@ -55,36 +62,47 @@ async function flushSprint(sprintId) {
   delete state._dirtySprintIds[sprintId];
   const sprint = state.sprintsById[sprintId];
   if (!sprint) return;
+  const body = JSON.stringify({
+    startDate: sprint.startDate,
+    endDate: sprint.endDate,
+    lengthDays: sprint.lengthDays,
+    pointStep: sprint.pointStep,
+    goalPoints: sprint.goalPoints,
+    name: sprint.name || '',
+    description: sprint.description || '',
+    retrospective: sprint.retrospective || '',
+    categories: sprint.categories || [],
+    habitDefinitions: sprint.habitDefinitions || [],
+  });
+  // Skip the network round-trip entirely when nothing has changed since the
+  // last successful sync. Spurious dirty markings happen (e.g. opening a
+  // modal that touches `state` triggers downstream paths that call
+  // pushSprint) and the user-visible "SYNCING…" pill flashing on every
+  // such occasion looked like over-eager syncing.
+  if (lastSyncedSprintBody.get(sprintId) === body) return;
   inflight++;
   bumpStatus();
-  render();
+  let needsRender = false;
   try {
     const res = await fetch(`${API_SPRINT}/${encodeURIComponent(sprintId)}`, {
       method: 'PUT',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        startDate: sprint.startDate,
-        endDate: sprint.endDate,
-        lengthDays: sprint.lengthDays,
-        pointStep: sprint.pointStep,
-        goalPoints: sprint.goalPoints,
-        name: sprint.name || '',
-        description: sprint.description || '',
-        retrospective: sprint.retrospective || '',
-        categories: sprint.categories || [],
-        habitDefinitions: sprint.habitDefinitions || [],
-      }),
+      body,
     });
     if (!res.ok) throw new Error('sprint ' + res.status);
     try {
       const payload = await res.clone().json();
       if (payload && Array.isArray(payload.removedHabitIds) && payload.removedHabitIds.length) {
         applyOrphanSweepLocally(payload.removedHabitIds);
+        needsRender = true; // orphan sweep removed habits; visible on Entry/Plan
       }
     } catch (_) {}
+    lastSyncedSprintBody.set(sprintId, body);
     state.sprintSummaries = null;
     state.trendsCache = {};
+    // Only re-render if the current tab is the one whose data just changed.
+    if (state.tab === 'trends') needsRender = true;
   } catch (_) {
     state._dirtySprintIds[sprintId] = true;
     inflight--;
@@ -93,7 +111,7 @@ async function flushSprint(sprintId) {
   }
   inflight--;
   bumpStatus();
-  render();
+  if (needsRender) render();
 }
 
 async function flushEntry(dateKey) {
@@ -102,20 +120,22 @@ async function flushEntry(dateKey) {
   const empty = !entry || Object.keys(entry.habitValuesById || {}).length === 0;
   delete state._dirtyEntryDates[dateKey];
   if (empty) state._deletedEntryDates = state._deletedEntryDates.filter((d) => d !== dateKey);
+  const body = JSON.stringify({ habitValuesById: empty ? {} : entry.habitValuesById });
+  if (lastSyncedEntryBody.get(dateKey) === body) return;
   inflight++;
   bumpStatus();
-  render();
+  let needsRender = false;
   try {
     const res = await fetch(`${API_ENTRY}/${encodeURIComponent(dateKey)}`, {
       method: 'PUT',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ habitValuesById: empty ? {} : entry.habitValuesById }),
+      body,
     });
     if (!res.ok) throw new Error('entry-put ' + res.status);
     // First-entry → sprint started: the lambda set startDate + endDate on the
-    // covering sprint. Patch state so the UI reflects the transition without a
-    // full reload.
+    // covering sprint. Patch state so the UI reflects the transition (PLANNING
+    // → DAY 1/N in the header) without a full reload.
     try {
       const payload = await res.clone().json();
       if (payload?.sprintStarted) {
@@ -124,14 +144,17 @@ async function flushEntry(dateKey) {
         if (sprint) {
           sprint.startDate = startDate;
           sprint.endDate = endDate;
+          needsRender = true; // header text changes
         }
       }
     } catch (_) {}
+    lastSyncedEntryBody.set(dateKey, body);
     for (const url of Object.keys(state.trendsCache)) {
       const r = state.trendsCache[url];
       if (r && r.from <= dateKey && dateKey <= r.to) delete state.trendsCache[url];
     }
     state.sprintSummaries = null;
+    if (state.tab === 'trends') needsRender = true;
   } catch (_) {
     if (empty) {
       if (!state._deletedEntryDates.includes(dateKey)) state._deletedEntryDates.push(dateKey);
@@ -144,7 +167,7 @@ async function flushEntry(dateKey) {
   }
   inflight--;
   bumpStatus();
-  render();
+  if (needsRender) render();
 }
 
 // ── Lazy loaders ───────────────────────────────────────────────────────
